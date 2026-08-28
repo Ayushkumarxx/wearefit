@@ -167,9 +167,48 @@ export const useHealthStore = create<HealthState>()(
           updatedAt: new Date().toISOString(),
         };
 
+        let currentCompleted = partial.completedPrescriptions !== undefined 
+          ? partial.completedPrescriptions 
+          : (existing.completedPrescriptions || []);
+
+        const finalWater = partial.waterLiters !== undefined ? partial.waterLiters : existing.waterLiters;
+        const finalSteps = partial.steps !== undefined ? partial.steps : existing.steps;
+        const finalWorkout = partial.workoutMinutes !== undefined ? partial.workoutMinutes : existing.workoutMinutes;
+        const finalSleep = partial.sleepHours !== undefined ? partial.sleepHours : existing.sleepHours;
+        const finalAteOutside = partial.ateOutside !== undefined ? partial.ateOutside : existing.ateOutside;
+        const finalUltraProcessed = partial.ultraProcessed !== undefined ? partial.ultraProcessed : existing.ultraProcessed;
+
+        // If water was directly resolved (>= 2.0L), remove water task
+        if (finalWater >= 2.0) {
+          currentCompleted = currentCompleted.filter((id) => id !== "today_water_hydrate");
+        }
+        // If steps were directly resolved (>= 8000), remove step tasks
+        if (finalSteps >= 8000) {
+          currentCompleted = currentCompleted.filter((id) => id !== "today_movement_steps" && id !== "today_evening_walk");
+        }
+        // If workout was directly resolved (>= 30m), remove workout session task
+        if (finalWorkout >= 30) {
+          currentCompleted = currentCompleted.filter((id) => id !== "today_workout_session");
+        }
+        // If sleep was directly resolved (>= 7.0h), remove sleep deficit tasks
+        if (finalSleep >= 7.0) {
+          currentCompleted = currentCompleted.filter(
+            (id) =>
+              id !== "today_sleep_nap" &&
+              id !== "today_sleep_caffeine" &&
+              id !== "today_sleep_early" &&
+              id !== "today_sleep_cool"
+          );
+        }
+        // If whole food eating is restored, remove digest walk and tea flush
+        if (!finalAteOutside && !finalUltraProcessed) {
+          currentCompleted = currentCompleted.filter((id) => id !== "today_walk_digest" && id !== "today_tea_flush");
+        }
+
         const updatedLog: DailyLog = {
           ...existing,
           ...partial,
+          completedPrescriptions: currentCompleted,
           macros: {
             ...existing.macros,
             ...(partial.macros || {}),

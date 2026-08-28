@@ -97,15 +97,9 @@ export function ShouldIAdvisor() {
       updates.ultraProcessed = true;
     }
 
-    // AUTO-SCHEDULE RECOVERY TASK DIRECTLY (Zero extra buttons required!)
+    // AUTO-SCHEDULE RECOVERY TASK DIRECTLY TO TODAY'S PLAN!
     if (activeResponse.suggestedCompensation) {
-      const isTomorrow = activeResponse.actionTiming === "tomorrow";
-      const targetDate = isTomorrow
-        ? format(addDays(parseISO(selectedDate), 1), "yyyy-MM-dd")
-        : selectedDate;
-
-      const targetLog = getLogForDate(targetDate);
-      const customTasks = targetLog.activeCustomTasks || [];
+      const currentCustom = currentLog.activeCustomTasks || [];
       const taskObj = {
         id: `task_${Date.now()}`,
         title: activeResponse.compensationTip || activeResponse.suggestedCompensation.title,
@@ -114,16 +108,25 @@ export function ShouldIAdvisor() {
         isCompleted: false,
       };
 
-      saveDailyLog(targetDate, {
-        activeCustomTasks: [...customTasks.filter((t) => t.title !== taskObj.title), taskObj],
-      });
+      const newCustomTasks = [...currentCustom.filter((t) => t.title !== taskObj.title), taskObj];
+      updates.activeCustomTasks = newCustomTasks;
+
+      // If action is also meant for tomorrow, schedule next-day coupon too
+      if (activeResponse.actionTiming === "tomorrow") {
+        const tomorrowDate = format(addDays(parseISO(selectedDate), 1), "yyyy-MM-dd");
+        const tomorrowLog = getLogForDate(tomorrowDate);
+        const tomorrowCustom = tomorrowLog.activeCustomTasks || [];
+        saveDailyLog(tomorrowDate, {
+          activeCustomTasks: [...tomorrowCustom.filter((t) => t.title !== taskObj.title), taskObj],
+        });
+      }
     }
 
     saveDailyLog(selectedDate, updates);
 
     const deltaSign = activeResponse.adjustedHPImpact >= 0 ? "+" : "";
-    toast.success("Logged & Recovery Fix Auto-Added! 🌿", {
-      description: `${activeResponse.question} (${deltaSign}${activeResponse.adjustedHPImpact} HP) logged. Recovery task added to ${activeResponse.actionTiming === "tomorrow" ? "Tomorrow's" : "Today's"} plan.`,
+    toast.success("Logged & Added to Today's Recovery Plan! 🌿", {
+      description: `${activeResponse.question} (${deltaSign}${activeResponse.adjustedHPImpact} HP) logged. Recovery task is live on your homepage!`,
     });
   };
 

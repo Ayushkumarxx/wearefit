@@ -516,6 +516,34 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
   }
 
   // ==========================================
+  // 7. LOGGED ADVICE ACTIONS (FROM 'SHOULD I' ADVISOR)
+  // ==========================================
+  const loggedAdvice = log.loggedAdviceActions || [];
+  loggedAdvice.forEach((adv) => {
+    if (adv.pointsDelta < 0) {
+      deductionsHp += Math.abs(adv.pointsDelta);
+      items.push({
+        id: `adv_${adv.id}`,
+        label: adv.title,
+        detail: `Logged advice indulgence (${adv.pointsDelta} HP)`,
+        pointsDelta: adv.pointsDelta,
+        type: "negative",
+        category: adv.category || "habits",
+      });
+    } else if (adv.pointsDelta > 0) {
+      completedBonusHp += adv.pointsDelta;
+      items.push({
+        id: `adv_${adv.id}`,
+        label: adv.title,
+        detail: `Logged positive choice (+${adv.pointsDelta} HP)`,
+        pointsDelta: adv.pointsDelta,
+        type: "positive",
+        category: adv.category || "recovery",
+      });
+    }
+  });
+
+  // ==========================================
   // FINAL SCORE COMPUTATION
   // ==========================================
   const baseEarned = earnedSleepHp + earnedNutritionHp + earnedMovementHp + earnedHydrationHp;
