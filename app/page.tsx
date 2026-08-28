@@ -57,7 +57,7 @@ export default function HomePage() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden relative pb-32">
         {activeTab === "today" && (
           <div className="space-y-4">
-            {/* 1. Center 100 HP Gauge with 7-Day HP Trend Toggle */}
+            {/* 1. Center 100 HP Gauge with 7-Day Trend Toggle */}
             <HealthScoreHero />
 
             {/* 2. Today's Plan to Recover */}

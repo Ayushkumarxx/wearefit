@@ -17,31 +17,37 @@ export function HealthScoreHero() {
   const receipt = getReceiptForDate(selectedDate);
   const currentStreak = calculateConsecutiveStreak(dailyLogs, selectedDate);
 
-  // Generate 7-day HP trend history
+  // Generate 7-day Trend history (shows 0 for unlogged days)
   const last7DaysHP = Array.from({ length: 7 }).map((_, i) => {
     const d = format(subDays(new Date(), 6 - i), "yyyy-MM-dd");
     const dayLabel = format(subDays(new Date(), 6 - i), "EEE");
+    const hasData = Boolean(dailyLogs[d]);
     const dayReceipt = getReceiptForDate(d);
+    const score = hasData ? dayReceipt.totalScore : 0;
     return {
       date: d,
       dayLabel,
-      score: dayReceipt.totalScore,
+      score,
+      hasData,
       isToday: i === 6,
     };
   });
 
-  const avgWeeklyHP = Math.round(
-    last7DaysHP.reduce((acc, d) => acc + d.score, 0) / (last7DaysHP.length || 1)
-  );
+  const loggedDays = last7DaysHP.filter((d) => d.hasData);
+  const avgWeeklyHP =
+    loggedDays.length > 0
+      ? Math.round(loggedDays.reduce((acc, d) => acc + d.score, 0) / loggedDays.length)
+      : (dailyLogs[selectedDate] ? receipt.totalScore : 0);
 
-  const getStatusBadge = (score: number) => {
+  const getStatusBadge = (score: number, hasAnyData: boolean) => {
+    if (!hasAnyData || score === 0) return { text: "No Data", color: "bg-neutral-100 text-neutral-500 border border-neutral-200" };
     if (score >= 85) return { text: "Optimal", color: "bg-[#D8EDDE] text-[#0A3D22]" };
     if (score >= 70) return { text: "Balanced", color: "bg-emerald-50 text-emerald-700 border border-emerald-200" };
     if (score >= 55) return { text: "Recovery", color: "bg-amber-50 text-amber-700 border border-amber-200" };
     return { text: "Deficit", color: "bg-rose-50 text-rose-700 border border-rose-200" };
   };
 
-  const statusBadge = getStatusBadge(avgWeeklyHP);
+  const statusBadge = getStatusBadge(avgWeeklyHP, loggedDays.length > 0);
 
   return (
     <div className="flex flex-col items-center px-5 pt-2 pb-5 space-y-3 select-none">
@@ -64,7 +70,7 @@ export function HealthScoreHero() {
           )}
         >
           <Activity className="w-3 h-3" />
-          <span>7-Day HP Trend</span>
+          <span>7-Day Trend</span>
         </button>
       </div>
 
@@ -100,13 +106,15 @@ export function HealthScoreHero() {
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#1B6C43]">
-                    Weekly Report
+                    7-Day Trend Report
                   </span>
                   <div className="flex items-baseline gap-1 mt-0.5">
                     <span className="font-display font-black text-2xl text-[#191C1A]">
                       {avgWeeklyHP} HP
                     </span>
-                    <span className="text-xs font-bold text-neutral-500">7-Day Avg</span>
+                    <span className="text-xs font-bold text-neutral-500">
+                      {loggedDays.length > 0 ? `${loggedDays.length}d Avg` : "No Logs"}
+                    </span>
                   </div>
                 </div>
 
@@ -120,17 +128,24 @@ export function HealthScoreHero() {
               <div className="grid grid-cols-7 gap-2 pt-1">
                 {last7DaysHP.map((day, idx) => (
                   <div key={day.date} className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] font-mono font-bold text-neutral-600">
+                    <span
+                      className={cn(
+                        "text-[10px] font-mono font-bold",
+                        day.hasData ? "text-neutral-700" : "text-neutral-300"
+                      )}
+                    >
                       {day.score}
                     </span>
                     <div className="w-full h-20 bg-neutral-100 rounded-xl p-1 flex items-end justify-center">
                       <motion.div
                         initial={{ height: 0 }}
-                        animate={{ height: `${Math.max(15, day.score)}%` }}
+                        animate={{ height: day.hasData ? `${Math.max(15, day.score)}%` : "4%" }}
                         transition={{ type: "spring", stiffness: 300, damping: 25, delay: idx * 0.04 }}
                         className={cn(
                           "w-full rounded-lg transition-colors",
-                          day.isToday
+                          !day.hasData
+                            ? "bg-neutral-200"
+                            : day.isToday
                             ? "bg-gradient-to-t from-[#0A3D22] to-[#1B6C43]"
                             : day.score >= 80
                             ? "bg-[#1B6C43]/80"
