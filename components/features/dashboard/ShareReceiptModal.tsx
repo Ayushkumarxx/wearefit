@@ -100,32 +100,86 @@ export function ShareReceiptModal() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 4. TOP BENTO GRID SECTION (Left: Health Gauge Dial, Right: 4 Metric Cards)
+    // 4. TOP BENTO GRID SECTION (Symmetrical: 3 Left Cards | Center Dial | 3 Right Cards)
     const bentoTopY = curY + 28;
-    const bentoLeftW = 390;
-    const bentoRightW = 410;
-    const bentoH = 340;
-    const bentoGap = 30;
-    const bentoStartX = cardX + 50;
+    const bentoH = 390;
+    const colW = 225;
+    const centerW = 360;
+    const colGap = 15;
+    const leftStartX = cardX + 45;
+    const centerStartX = leftStartX + colW + colGap;
+    const rightStartX = centerStartX + centerW + colGap;
+    const miniCardH = 118;
+    const miniGap = 18;
 
-    // A. Left Box: Large Health Gauge Dial
+    // A. LEFT COLUMN (3 Cards: Streak, Sleep, Calories)
+    const leftMetrics = [
+      {
+        emoji: "🔥",
+        title: "Active Streak",
+        value: `${streakCount} Days`,
+        bg: "#FFF4D9",
+        border: "#FFE7A3",
+        text: "#78350F",
+      },
+      {
+        emoji: "🌙",
+        title: "Rest Recovery",
+        value: `${log.sleepHours || 8.0} hrs`,
+        bg: "#F3E8FF",
+        border: "#E9D5FF",
+        text: "#6B21A8",
+      },
+      {
+        emoji: "🥗",
+        title: "Fuel Calories",
+        value: `${log.calories || 2000} kcal`,
+        bg: "#E8F5E9",
+        border: "#C8E6C9",
+        text: "#1B5E20",
+      },
+    ];
+
+    leftMetrics.forEach((m, idx) => {
+      const mY = bentoTopY + idx * (miniCardH + miniGap);
+      ctx.fillStyle = m.bg;
+      ctx.beginPath();
+      ctx.roundRect(leftStartX, mY, colW, miniCardH, 20);
+      ctx.fill();
+      ctx.strokeStyle = m.border;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.font = "24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(m.emoji, leftStartX + 16, mY + 38);
+
+      ctx.fillStyle = "#6B7280";
+      ctx.font = "700 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(m.title, leftStartX + 16, mY + 68);
+
+      ctx.fillStyle = m.text;
+      ctx.font = "900 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(m.value, leftStartX + 16, mY + 98);
+    });
+
+    // B. CENTER COLUMN (Prominent Circular Health Gauge Dial)
     ctx.fillStyle = "#F7FAF7";
     ctx.beginPath();
-    ctx.roundRect(bentoStartX, bentoTopY, bentoLeftW, bentoH, 32);
+    ctx.roundRect(centerStartX, bentoTopY, centerW, bentoH, 32);
     ctx.fill();
     ctx.strokeStyle = "#E2ECE2";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Circular dial inside left box
-    const dialCenterX = bentoStartX + bentoLeftW / 2;
-    const dialCenterY = bentoTopY + 130;
-    const dialRadius = 78;
+    const dialCenterX = centerStartX + centerW / 2;
+    const dialCenterY = bentoTopY + 155;
+    const dialRadius = 90;
 
     // Background track
     ctx.beginPath();
     ctx.arc(dialCenterX, dialCenterY, dialRadius, 0, 2 * Math.PI);
-    ctx.lineWidth = 14;
+    ctx.lineWidth = 16;
     ctx.strokeStyle = "#E5EAE5";
     ctx.stroke();
 
@@ -133,26 +187,26 @@ export function ShareReceiptModal() {
     const progress = Math.max(0.05, Math.min(1, receipt.totalScore / 100));
     ctx.beginPath();
     ctx.arc(dialCenterX, dialCenterY, dialRadius, -Math.PI / 2, -Math.PI / 2 + progress * 2 * Math.PI);
-    ctx.lineWidth = 14;
+    ctx.lineWidth = 16;
     ctx.strokeStyle = receipt.totalScore >= 80 ? "#1B6C43" : receipt.totalScore >= 60 ? "#D97706" : "#BA1A1A";
     ctx.lineCap = "round";
     ctx.stroke();
 
     // Center HP Score
     ctx.fillStyle = "#191C1A";
-    ctx.font = "900 52px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "900 56px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${receipt.totalScore}`, dialCenterX - 18, dialCenterY + 15);
+    ctx.fillText(`${receipt.totalScore}`, dialCenterX - 18, dialCenterY + 16);
 
     ctx.fillStyle = "#1B6C43";
-    ctx.font = "900 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    ctx.fillText("HP", dialCenterX + 44, dialCenterY + 15);
+    ctx.font = "900 22px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("HP", dialCenterX + 46, dialCenterY + 16);
 
-    // Grade status and Mood badge at bottom of left box
-    const gradePillY = dialCenterY + 115;
+    // Grade status and Mood badge at bottom of center box
+    const gradePillY = dialCenterY + 140;
     ctx.fillStyle = receipt.totalScore >= 80 ? "#D8EDDE" : receipt.totalScore >= 60 ? "#FFF4D9" : "#FFE8E6";
     ctx.beginPath();
-    ctx.roundRect(dialCenterX - 165, gradePillY - 20, 330, 42, 21);
+    ctx.roundRect(dialCenterX - 155, gradePillY - 22, 310, 44, 22);
     ctx.fill();
     ctx.strokeStyle = receipt.totalScore >= 80 ? "#B9DEC3" : receipt.totalScore >= 60 ? "#FFE7A3" : "#FFC9C6";
     ctx.lineWidth = 1.5;
@@ -170,43 +224,31 @@ export function ShareReceiptModal() {
         : "✨";
 
     ctx.fillStyle = receipt.totalScore >= 80 ? "#0A3D22" : receipt.totalScore >= 60 ? "#78350F" : "#90000A";
-    ctx.font = "800 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.font = "800 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(`${moodEmoji} Grade ${receipt.grade} • ${receipt.gradeLabel}`, dialCenterX, gradePillY + 6);
+    ctx.fillText(`${moodEmoji} Grade ${receipt.grade} • ${receipt.gradeLabel}`, dialCenterX, gradePillY + 5);
 
-    // B. Right Bento Grid: 4 Metric Cards (2x2) [Streak, Sleep, Steps, Workout]
-    const rightStartX = bentoStartX + bentoLeftW + bentoGap;
-    const miniCardW = (bentoRightW - 16) / 2;
-    const miniCardH = (bentoH - 16) / 2;
-
-    const metrics = [
-      {
-        emoji: "🔥",
-        title: "Active Streak",
-        value: `${streakCount} Days`,
-        bg: "#FFF4D9",
-        border: "#FFE7A3",
-        text: "#78350F",
-      },
-      {
-        emoji: "🌙",
-        title: "Deep Sleep",
-        value: `${log.sleepHours || 8.0} hrs`,
-        bg: "#F3E8FF",
-        border: "#E9D5FF",
-        text: "#6B21A8",
-      },
+    // C. RIGHT COLUMN (3 Cards: Steps, Water, Workout/Quality)
+    const rightMetrics = [
       {
         emoji: "👟",
-        title: "Daily Steps",
+        title: "Daily Movement",
         value: `${(log.steps || 8500).toLocaleString()}`,
         bg: "#D8EDDE",
         border: "#B9DEC3",
         text: "#0A3D22",
       },
       {
+        emoji: "💧",
+        title: "Hydration",
+        value: `${log.waterLiters || 2.5} L`,
+        bg: "#E0F2FE",
+        border: "#BAE6FD",
+        text: "#0369A1",
+      },
+      {
         emoji: "🏋️",
-        title: "Workout",
+        title: "Athletic Training",
         value: `${log.workoutMinutes || 0} mins`,
         bg: "#FEF3C7",
         border: "#FDE68A",
@@ -214,34 +256,27 @@ export function ShareReceiptModal() {
       },
     ];
 
-    metrics.forEach((m, idx) => {
-      const col = idx % 2;
-      const row = Math.floor(idx / 2);
-      const mX = rightStartX + col * (miniCardW + 16);
-      const mY = bentoTopY + row * (miniCardH + 16);
-
+    rightMetrics.forEach((m, idx) => {
+      const mY = bentoTopY + idx * (miniCardH + miniGap);
       ctx.fillStyle = m.bg;
       ctx.beginPath();
-      ctx.roundRect(mX, mY, miniCardW, miniCardH, 24);
+      ctx.roundRect(rightStartX, mY, colW, miniCardH, 20);
       ctx.fill();
       ctx.strokeStyle = m.border;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Emoji
-      ctx.font = "28px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.font = "24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillText(m.emoji, mX + 18, mY + 45);
+      ctx.fillText(m.emoji, rightStartX + 16, mY + 38);
 
-      // Title
       ctx.fillStyle = "#6B7280";
-      ctx.font = "700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(m.title, mX + 18, mY + 80);
+      ctx.font = "700 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(m.title, rightStartX + 16, mY + 68);
 
-      // Value
       ctx.fillStyle = m.text;
-      ctx.font = "900 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(m.value, mX + 18, mY + 120);
+      ctx.font = "900 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillText(m.value, rightStartX + 16, mY + 98);
     });
 
     // 5. BASE DEPOSIT ROW

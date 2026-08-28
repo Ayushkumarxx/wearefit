@@ -9,7 +9,13 @@ import { GardenItem } from "@/types/health";
 import { cn } from "@/lib/utils";
 
 export function LivingGarden() {
-  const { dailyLogs, setSelectedDate, setIsReceiptModalOpen, getReceiptForDate } = useHealthStore();
+  const {
+    dailyLogs,
+    setSelectedDate,
+    setIsReceiptModalOpen,
+    setIsEntryModalOpen,
+    getReceiptForDate,
+  } = useHealthStore();
   const [filter, setFilter] = useState<"all" | "healthy" | "unhealthy">("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [inspectedItem, setInspectedItem] = useState<GardenItem | null>(null);

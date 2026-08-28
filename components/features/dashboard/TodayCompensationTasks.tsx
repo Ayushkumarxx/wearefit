@@ -59,11 +59,70 @@ export function TodayCompensationTasks() {
   };
 
   // Time-of-day dynamic tasks (No redundant "X hour left" pill)
-  const dynamicTasks: Array<{ id: string; title: string; recoveryHp: number; icon: React.ReactNode }> = [];
+  const dynamicTasks: Array<{
+    id: string;
+    title: string;
+    recoveryHp: number;
+    icon: React.ReactNode;
+    isYesterday?: boolean;
+  }> = [];
 
-  // A. TODAY'S IMMEDIATE DEFICITS (Time-Aware & Context-Aware):
+  // A. TODAY'S IMMEDIATE DEFICITS & ROADMAP TO 100 HP (Time-Aware & Context-Aware):
 
-  // 1. Sleep Deficit Today (<6.5h sleep)
+  // 1. Movement & Athletic Training Roadmap (Daytime vs Nighttime)
+  if ((log.steps || 0) < 8000 && (log.workoutMinutes || 0) === 0) {
+    if (hoursLeft > 6) {
+      dynamicTasks.push({
+        id: "today_movement_steps",
+        title: "Hit 8,000 Daily Steps (Movement Baseline to 100 HP)",
+        recoveryHp: 5,
+        icon: <Footprints className="w-4 h-4 text-emerald-600" />,
+      });
+      dynamicTasks.push({
+        id: "today_workout_session",
+        title: "30-Min Workout / Athletic Training Session",
+        recoveryHp: 5,
+        icon: <Dumbbell className="w-4 h-4 text-amber-600" />,
+      });
+    } else if (!isLateNight) {
+      dynamicTasks.push({
+        id: "today_evening_walk",
+        title: "20-Min Evening Movement Walk (2,500 Steps)",
+        recoveryHp: 4,
+        icon: <Footprints className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+  } else if ((log.steps || 0) < 5000) {
+    if (hoursLeft > 4) {
+      dynamicTasks.push({
+        id: "today_evening_walk",
+        title: "Brisk Movement Walk (3,000 Steps to 100 HP)",
+        recoveryHp: 4,
+        icon: <Footprints className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+  }
+
+  // 2. Hydration Roadmap
+  if ((log.waterLiters || 0) < 2.0) {
+    if (isLateNight) {
+      dynamicTasks.push({
+        id: "today_water_hydrate",
+        title: "Sip 250ml Electrolyte Water (Gentle Evening Hydration)",
+        recoveryHp: 4,
+        icon: <Droplet className="w-4 h-4 text-blue-600" />,
+      });
+    } else {
+      dynamicTasks.push({
+        id: "today_water_hydrate",
+        title: `Drink ${log.waterLiters === 0 ? "2.0L" : "1.0L"} Electrolyte Mineral Water`,
+        recoveryHp: 5,
+        icon: <Droplet className="w-4 h-4 text-blue-600" />,
+      });
+    }
+  }
+
+  // 3. Sleep Deficit Today (<6.5h sleep)
   if (log.sleepHours > 0 && log.sleepHours < 6.5) {
     if (hoursLeft > 6) {
       dynamicTasks.push({
@@ -94,41 +153,6 @@ export function TodayCompensationTasks() {
     }
   }
 
-  // 2. Dehydration recovery
-  if (log.waterLiters < 2.0) {
-    if (isLateNight) {
-      dynamicTasks.push({
-        id: "today_water_hydrate",
-        title: "Sip 250ml Electrolyte Water (Gentle Evening Hydration)",
-        recoveryHp: 4,
-        icon: <Droplet className="w-4 h-4 text-blue-600" />,
-      });
-    } else {
-      dynamicTasks.push({
-        id: "today_water_hydrate",
-        title: `Drink ${log.waterLiters === 0 ? "2.0L" : "1.0L"} Electrolyte Mineral Water`,
-        recoveryHp: 5,
-        icon: <Droplet className="w-4 h-4 text-blue-600" />,
-      });
-    }
-  }
-
-  // 3. Heavy Workout / High Step Exertion Recovery (>90m workout or >18k steps)
-  if ((log.workoutMinutes || 0) >= 75 || (log.steps || 0) >= 16000) {
-    dynamicTasks.push({
-      id: "today_heavy_recovery",
-      title: "Active Muscle Recovery & Warm Epsom Bath",
-      recoveryHp: 5,
-      icon: <Dumbbell className="w-4 h-4 text-amber-600" />,
-    });
-    dynamicTasks.push({
-      id: "today_heavy_protein",
-      title: "35g Leucine-Rich Protein Refuel for Muscle Repair",
-      recoveryHp: 5,
-      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
-    });
-  }
-
   // 4. Calorie under-fueling / zero calories
   if (log.calories === 0) {
     dynamicTasks.push({
@@ -155,17 +179,7 @@ export function TodayCompensationTasks() {
     }
   }
 
-  // 5. Protein deficit
-  if (log.calories > 0 && log.macros && (log.macros.protein || 0) < minProtein) {
-    dynamicTasks.push({
-      id: "today_protein_boost",
-      title: "High-Protein Refuel Snack (25g Protein)",
-      recoveryHp: 5,
-      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
-    });
-  }
-
-  // 6. Caloric surplus / heavy meal / outside food
+  // 5. Caloric surplus / heavy meal / outside food
   if (log.calories > baseTargetCalories + 350 || log.ateOutside) {
     dynamicTasks.push({
       id: "today_walk_digest",
@@ -175,7 +189,7 @@ export function TodayCompensationTasks() {
     });
   }
 
-  // 7. Ultra-processed antioxidant flush
+  // 6. Ultra-processed antioxidant flush
   if (log.ultraProcessed) {
     dynamicTasks.push({
       id: "today_tea_flush",
@@ -185,13 +199,19 @@ export function TodayCompensationTasks() {
     });
   }
 
-  // 8. Low step count movement task
-  if (log.steps < 3500 && (log.workoutMinutes || 0) === 0) {
+  // 7. Heavy Workout / High Step Exertion Recovery (>90m workout or >18k steps)
+  if ((log.workoutMinutes || 0) >= 75 || (log.steps || 0) >= 16000) {
     dynamicTasks.push({
-      id: "today_evening_walk",
-      title: isLateNight ? "15-Min Evening Stroll (1,500 Steps)" : "Brisk Movement Walk (3,000 Steps)",
-      recoveryHp: 4,
-      icon: <Footprints className="w-4 h-4 text-emerald-600" />,
+      id: "today_heavy_recovery",
+      title: "Active Muscle Recovery & Warm Epsom Bath",
+      recoveryHp: 5,
+      icon: <Dumbbell className="w-4 h-4 text-amber-600" />,
+    });
+    dynamicTasks.push({
+      id: "today_heavy_protein",
+      title: "35g Leucine-Rich Protein Refuel for Muscle Repair",
+      recoveryHp: 5,
+      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
     });
   }
 

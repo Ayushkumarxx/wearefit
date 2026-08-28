@@ -27,15 +27,31 @@ export function TomorrowPrescriptionCard({ receipt, className }: TomorrowPrescri
   const customTomorrowTasks = tomorrowLog?.activeCustomTasks || [];
   const prescriptions = receipt?.prescriptions || [];
   const items = receipt?.items || [];
-  const totalScore = receipt?.totalScore || 0;
+  // If no debts exist, render minimal clean card with signature dashed coupon border
+  if (prescriptions.length === 0 && customTomorrowTasks.length === 0) {
+    return (
+      <div
+        className={cn(
+          "relative bg-white rounded-3xl p-5 border-2 border-dashed border-[#1B6C43]/30 shadow-xs text-[#191C1A] space-y-2.5 select-none",
+          className
+        )}
+      >
+        <div className="flex items-center justify-between pb-2 border-b border-dashed border-neutral-200">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-[#1B6C43]" />
+            <h4 className="font-display font-black text-xs text-[#191C1A] uppercase tracking-wider">
+              Tomorrow Plan
+            </h4>
+          </div>
+          <span className="text-[10px] font-bold text-[#1B6C43]">Solid Balance</span>
+        </div>
 
-  // If score is pristine (>=95) with no penalties and no custom tasks, hide card
-  if (
-    prescriptions.length === 0 &&
-    customTomorrowTasks.length === 0 &&
-    (items.length === 0 || totalScore >= 95)
-  ) {
-    return null;
+        <div className="py-1 space-y-0.5">
+          <p className="text-xs font-black text-[#191C1A]">You are in solid balance.</p>
+          <p className="text-[11px] text-neutral-500 font-medium">No specific plan for tomorrow.</p>
+        </div>
+      </div>
+    );
   }
 
   const getIcon = (iconName: string) => {

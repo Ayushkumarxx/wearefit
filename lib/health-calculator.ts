@@ -80,14 +80,32 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
       compensationCategory: "sleep",
       iconName: "Moon",
     });
-  } else if (log.sleepHours > 0) {
+  } else if (log.sleepHours >= 4.0) {
     earnedSleepHp = 10;
+    items.push({
+      id: "sleep_deficit",
+      label: "Sleep Deficit Logged",
+      detail: `Only ${log.sleepHours} hrs sleep logged — high fatigue accumulation`,
+      pointsDelta: +10,
+      type: "positive",
+      category: "sleep",
+    });
+    prescriptions.push({
+      id: "rx_sleep_boost",
+      title: "8.5h Deep Catchup Sleep Tonight",
+      detail: "Prioritize dark cool room and no screens 1h pre-bed",
+      targetValue: "8.5 hrs Sleep",
+      compensationCategory: "sleep",
+      iconName: "Moon",
+    });
+  } else if (log.sleepHours > 0) {
+    earnedSleepHp = 5;
     items.push({
       id: "sleep_severe_debt",
       label: "Acute Sleep Deprivation",
-      detail: `Only ${log.sleepHours} hrs sleep logged`,
-      pointsDelta: +10,
-      type: "negative",
+      detail: `Only ${log.sleepHours} hrs sleep logged — severe circadian debt`,
+      pointsDelta: +5,
+      type: "positive",
       category: "sleep",
     });
     prescriptions.push({
@@ -155,6 +173,26 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
         compensationCategory: "nutrition",
         iconName: "Salad",
       });
+    } else if (log.calories < 1200) {
+      deductionsHp += 6;
+      items.push({
+        id: "under_fueling",
+        label: "Under-Fueling Metabolic Strain",
+        detail: `Only ${log.calories} kcal logged — below 1,200 kcal basal baseline`,
+        pointsDelta: -6,
+        type: "negative",
+        category: "nutrition",
+      });
+      if (!prescriptions.some((p) => p.id === "rx_cal_refuel")) {
+        prescriptions.push({
+          id: "rx_cal_refuel",
+          title: `Target ${baseTargetCalories} Clean Calories Tomorrow`,
+          detail: "Fuel adequately with whole carbs & protein to maintain metabolic rate",
+          targetValue: `${baseTargetCalories} kcal`,
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
     }
 
     if (log.ultraProcessed) {
@@ -236,6 +274,16 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
       type: "positive",
       category: "activity",
     });
+  } else if (steps > 0) {
+    earnedMovementHp += 2;
+    items.push({
+      id: "steps_minimal",
+      label: "Minimal Steps Activity",
+      detail: `${steps.toLocaleString()} steps logged`,
+      pointsDelta: +2,
+      type: "positive",
+      category: "activity",
+    });
   }
 
   // Low Step Movement Prescription for Tomorrow
@@ -252,7 +300,7 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
     }
   }
 
-  if (workoutMins >= 30) {
+  if (workoutMins >= 45) {
     earnedMovementHp = Math.min(25, earnedMovementHp + 10);
     items.push({
       id: "workout_done",
@@ -262,13 +310,23 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
       type: "positive",
       category: "activity",
     });
+  } else if (workoutMins >= 20) {
+    earnedMovementHp = Math.min(25, earnedMovementHp + 7);
+    items.push({
+      id: "workout_done",
+      label: "Moderate Athletic Training",
+      detail: `${workoutMins} mins movement logged`,
+      pointsDelta: +7,
+      type: "positive",
+      category: "activity",
+    });
   } else if (workoutMins > 0) {
-    earnedMovementHp = Math.min(25, earnedMovementHp + 6);
+    earnedMovementHp = Math.min(25, earnedMovementHp + 4);
     items.push({
       id: "workout_light",
       label: "Light Workout Session",
       detail: `${workoutMins} mins movement logged`,
-      pointsDelta: +6,
+      pointsDelta: +4,
       type: "positive",
       category: "activity",
     });
@@ -331,11 +389,11 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
         iconName: "Droplet",
       });
     }
-  } else if (water > 0) {
+  } else if (water >= 0.5) {
     earnedHydrationHp = 5;
     items.push({
       id: "water_low",
-      label: "Initial Hydration Logged",
+      label: "Partial Hydration Logged",
       detail: `${water}L water logged — below 2.0L baseline`,
       pointsDelta: +5,
       type: "positive",
@@ -351,10 +409,68 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
         iconName: "Droplet",
       });
     }
+  } else if (water > 0) {
+    earnedHydrationHp = 3;
+    items.push({
+      id: "water_minimal",
+      label: "Initial Hydration Logged",
+      detail: `${water}L water logged`,
+      pointsDelta: +3,
+      type: "positive",
+      category: "hydration",
+    });
   }
 
   // ==========================================
-  // 5. COMPLETED RECOVERY TASKS (DIRECT HP BOOSTS)
+  // 5. SUBJECTIVE VITALITY & MOOD (-5 to +4 HP)
+  // ==========================================
+  let moodDelta = 0;
+  if (log.mood === "motivated") {
+    moodDelta = +4;
+    items.push({
+      id: "mood_motivated",
+      label: "High Drive & Mental Vitality",
+      detail: "Peak motivation and nervous system readiness",
+      pointsDelta: +4,
+      type: "positive",
+      category: "recovery",
+    });
+  } else if (log.mood === "good") {
+    moodDelta = +2;
+    items.push({
+      id: "mood_good",
+      label: "Positive Wellbeing State",
+      detail: "Balanced subjective mood and energy",
+      pointsDelta: +2,
+      type: "positive",
+      category: "recovery",
+    });
+  } else if (log.mood === "unmotivated") {
+    moodDelta = -2;
+    deductionsHp += 2;
+    items.push({
+      id: "mood_unmotivated",
+      label: "Mental Resistance / Low Drive",
+      detail: "Subtle psychological friction logged",
+      pointsDelta: -2,
+      type: "negative",
+      category: "habits",
+    });
+  } else if (log.mood === "fatigued") {
+    moodDelta = -5;
+    deductionsHp += 5;
+    items.push({
+      id: "mood_fatigued",
+      label: "Subjective Exhaustion & Fatigue",
+      detail: "Systemic lethargy and nervous fatigue reported",
+      pointsDelta: -5,
+      type: "negative",
+      category: "habits",
+    });
+  }
+
+  // ==========================================
+  // 6. COMPLETED RECOVERY TASKS (DIRECT HP BOOSTS)
   // ==========================================
   let completedBonusHp = 0;
   const completedList = log.completedPrescriptions || [];
@@ -403,10 +519,11 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
   // FINAL SCORE COMPUTATION
   // ==========================================
   const baseEarned = earnedSleepHp + earnedNutritionHp + earnedMovementHp + earnedHydrationHp;
+  const moodBonus = moodDelta > 0 ? moodDelta : 0;
   
   let finalScore = 0;
   if (baseEarned > 0 || completedBonusHp > 0) {
-    const rawScore = baseEarned + completedBonusHp + shieldBonus - deductionsHp;
+    const rawScore = baseEarned + moodBonus + completedBonusHp + shieldBonus - deductionsHp;
     finalScore = Math.max(10, Math.min(100, rawScore));
   }
 
