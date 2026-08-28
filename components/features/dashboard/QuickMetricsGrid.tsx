@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Moon, Flame, Footprints, Salad, Droplet } from "lucide-react";
+import { Moon, Flame, Footprints, Salad, Droplet, Utensils, ShieldAlert } from "lucide-react";
 import { useHealthStore } from "@/context/useHealthStore";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ export function QuickMetricsGrid() {
   const targetCalories = userProfile?.dailyCalorieTarget || 2000;
   const targetSleep = userProfile?.dailySleepTargetHours || 8;
   const targetSteps = userProfile?.dailyStepsTarget || 8000;
+  const targetProtein = Math.round((userProfile?.weightKg || 70) * 1.5);
 
   const getFoodRatingText = (score: number) => {
     if (score >= 9) return "Nutrient Dense";
@@ -41,6 +42,26 @@ export function QuickMetricsGrid() {
       icon: <Flame className="w-4 h-4 text-amber-600" />,
       bg: "bg-amber-50",
       borderHover: "hover:border-amber-300",
+    },
+    {
+      id: "protein",
+      title: "Protein Intake",
+      value: log.macros?.protein || 0,
+      unit: "g",
+      subtext: `Goal ${targetProtein}g`,
+      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+      bg: "bg-emerald-50",
+      borderHover: "hover:border-emerald-300",
+    },
+    {
+      id: "fat",
+      title: "Dietary Fats",
+      value: log.macros?.fat || 0,
+      unit: "g",
+      subtext: "Target 45-65g",
+      icon: <Salad className="w-4 h-4 text-rose-600" />,
+      bg: "bg-rose-50",
+      borderHover: "hover:border-rose-300",
     },
     {
       id: "steps",

@@ -25,12 +25,12 @@ export function parseVoiceInput(text: string, currentLog: DailyLog): ParsedSpeec
     }
   }
 
-  // 2. CALORIES DETECTION (e.g. "ate 2100 calories", "2200 kcal", "around 1800 cal")
-  const calorieMatch = lower.match(/(\d{3,5})\s*(?:calories|calorie|kcal|cals)/i)
-    || lower.match(/(?:ate|consumed|total of)\s*(\d{3,5})\s*(?:cal|calories|kcal)?/i);
+  // 2. CALORIES DETECTION (e.g. "ate 2100 calories", "2200 kcal", "around 1800 cal", "500 calories", "300 kcal")
+  const calorieMatch = lower.match(/(\d{2,5})\s*(?:calories|calorie|kcal|cals)/i)
+    || lower.match(/(?:ate|consumed|total of)\s*(\d{2,5})\s*(?:cal|calories|kcal)?/i);
   if (calorieMatch && calorieMatch[1]) {
     const cals = parseInt(calorieMatch[1], 10);
-    if (!isNaN(cals) && cals >= 400 && cals <= 8000) {
+    if (!isNaN(cals) && cals >= 50 && cals <= 8000) {
       extracted.calories = cals;
       insights.push(`Detected ${cals} kcal consumed`);
     }

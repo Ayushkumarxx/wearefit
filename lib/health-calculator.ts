@@ -106,8 +106,9 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
         compensationCategory: "nutrition",
         iconName: "Salad",
       });
-    } else if (log.calories < 1200 && log.workoutMinutes === 0) {
-      const penalty = 8;
+    } else if (log.calories < 1200) {
+      // Severe under-fueling (especially critical if working out)
+      const penalty = log.workoutMinutes > 0 ? 12 : 8;
       items.push({
         id: "cal_under",
         label: "Severe Under-Fueling",
@@ -116,14 +117,132 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
         type: "negative",
         category: "nutrition",
       });
-      prescriptions.push({
-        id: "rx_cal_refuel",
-        title: `Target ${baseTargetCalories} Clean Calories Tomorrow`,
-        detail: "Refuel with healthy fats and protein to restore metabolic rate",
-        targetValue: `${baseTargetCalories} kcal`,
-        compensationCategory: "nutrition",
-        iconName: "Salad",
+      if (!prescriptions.some((p) => p.id === "rx_cal_refuel")) {
+        prescriptions.push({
+          id: "rx_cal_refuel",
+          title: `Target ${baseTargetCalories} Clean Calories Tomorrow`,
+          detail: "Refuel with balanced macros and whole foods to prevent metabolic debt",
+          targetValue: `${baseTargetCalories} kcal`,
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
+    } else if (adjustedTargetCalories - log.calories >= 500) {
+      // Significant caloric deficit
+      const penalty = Math.min(9, Math.round((adjustedTargetCalories - log.calories - 400) / 150) * 2 + 4);
+      items.push({
+        id: "cal_deficit",
+        label: "Caloric Deficit Load",
+        detail: `${log.calories} kcal logged (${Math.round(adjustedTargetCalories - log.calories)} kcal below expenditure)`,
+        pointsDelta: -penalty,
+        type: "negative",
+        category: "nutrition",
       });
+      if (!prescriptions.some((p) => p.id === "rx_cal_refuel")) {
+        prescriptions.push({
+          id: "rx_cal_refuel",
+          title: `Target ${baseTargetCalories} Clean Calories Tomorrow`,
+          detail: "Fuel adequately to support energy demands and muscular recovery",
+          targetValue: `${baseTargetCalories} kcal`,
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
+    }
+  }
+
+  // 4B. MACRONUTRIENT DEFICITS (PROTEIN & ESSENTIAL HEALTHY FATS)
+  const weightKg = profile?.weightKg || 70;
+  const targetProtein = Math.round(weightKg * 1.5);
+  const minProteinThreshold = Math.round(weightKg * 0.8);
+
+  // Protein deficit check
+  if (log.calories > 0 && log.macros) {
+    const protein = log.macros.protein || 0;
+    if (protein > 0 && protein < 40) {
+      const penalty = 8;
+      items.push({
+        id: "protein_severe_deficit",
+        label: "Critical Protein Deficit",
+        detail: `Only ${protein}g protein logged (Min safe threshold: ${minProteinThreshold}g)`,
+        pointsDelta: -penalty,
+        type: "negative",
+        category: "nutrition",
+      });
+      if (!prescriptions.some((p) => p.id === "rx_protein_refuel")) {
+        prescriptions.push({
+          id: "rx_protein_refuel",
+          title: `Target ${targetProtein}g Protein Tomorrow`,
+          detail: "Fuel with lean poultry, eggs, fish, tofu, lentils, or Greek yogurt",
+          targetValue: `${targetProtein}g Protein`,
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
+    } else if (protein > 0 && protein < minProteinThreshold) {
+      const penalty = 5;
+      items.push({
+        id: "protein_mild_deficit",
+        label: "Low Protein Intake",
+        detail: `${protein}g protein logged (Target: ${targetProtein}g)`,
+        pointsDelta: -penalty,
+        type: "negative",
+        category: "nutrition",
+      });
+      if (!prescriptions.some((p) => p.id === "rx_protein_refuel")) {
+        prescriptions.push({
+          id: "rx_protein_refuel",
+          title: `Target ${targetProtein}g Protein Tomorrow`,
+          detail: "Boost protein intake to preserve lean mass and accelerate recovery",
+          targetValue: `${targetProtein}g Protein`,
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
+    }
+
+    // Dietary Fat deficit check
+    const fat = log.macros.fat || 0;
+    if (fat > 0 && fat < 20) {
+      const penalty = 6;
+      items.push({
+        id: "fat_severe_deficit",
+        label: "Essential Healthy Fat Deficit",
+        detail: `Only ${fat}g fat logged (Min: 35g for hormone and cellular health)`,
+        pointsDelta: -penalty,
+        type: "negative",
+        category: "nutrition",
+      });
+      if (!prescriptions.some((p) => p.id === "rx_healthy_fats")) {
+        prescriptions.push({
+          id: "rx_healthy_fats",
+          title: "Incorporate Healthy Fats Tomorrow",
+          detail: "Add extra virgin olive oil, avocados, nuts, chia seeds, or salmon",
+          targetValue: "45g Healthy Fats",
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
+    } else if (fat > 0 && fat < 30) {
+      const penalty = 4;
+      items.push({
+        id: "fat_mild_deficit",
+        label: "Low Dietary Fat Intake",
+        detail: `${fat}g fat logged (Target: 45-65g healthy fats)`,
+        pointsDelta: -penalty,
+        type: "negative",
+        category: "nutrition",
+      });
+      if (!prescriptions.some((p) => p.id === "rx_healthy_fats")) {
+        prescriptions.push({
+          id: "rx_healthy_fats",
+          title: "Incorporate Healthy Fats Tomorrow",
+          detail: "Include clean healthy fats for optimal lipid and vitamin absorption",
+          targetValue: "45g Healthy Fats",
+          compensationCategory: "nutrition",
+          iconName: "Salad",
+        });
+      }
     }
   }
 
@@ -298,12 +417,34 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
     });
   }
 
-  if (completedTasks.includes("today_refuel_protein")) {
+  if (completedTasks.includes("today_refuel_protein") || completedTasks.includes("today_protein_boost")) {
     items.push({
       id: "comp_refuel_done",
       label: "Protein Refuel Meal Fulfilled",
-      detail: "Nutrient-dense protein meal completed",
+      detail: "Nutrient-dense protein intake completed",
       pointsDelta: +5,
+      type: "positive",
+      category: "nutrition",
+    });
+  }
+
+  if (completedTasks.includes("today_cal_refuel")) {
+    items.push({
+      id: "comp_cal_refuel_done",
+      label: "Caloric Fueling Restored",
+      detail: "Metabolic energy deficit rebalanced",
+      pointsDelta: +5,
+      type: "positive",
+      category: "nutrition",
+    });
+  }
+
+  if (completedTasks.includes("today_healthy_fats")) {
+    items.push({
+      id: "comp_healthy_fats_done",
+      label: "Healthy Fats Restored",
+      detail: "Essential fatty acids intake completed",
+      pointsDelta: +4,
       type: "positive",
       category: "nutrition",
     });
@@ -340,6 +481,39 @@ export function calculateHealthScore(log: DailyLog, profile?: UserProfile | null
       pointsDelta: +4,
       type: "positive",
       category: "activity",
+    });
+  }
+
+  if (completedTasks.includes("comp_yesterday_refuel")) {
+    items.push({
+      id: "comp_yesterday_refuel_done",
+      label: "Metabolic Debt Paid",
+      detail: "Adequate caloric refuel fulfilled today",
+      pointsDelta: +5,
+      type: "positive",
+      category: "nutrition",
+    });
+  }
+
+  if (completedTasks.includes("comp_yesterday_protein")) {
+    items.push({
+      id: "comp_yesterday_protein_done",
+      label: "Protein Debt Paid",
+      detail: "Target protein intake fulfilled today",
+      pointsDelta: +5,
+      type: "positive",
+      category: "nutrition",
+    });
+  }
+
+  if (completedTasks.includes("comp_yesterday_fats")) {
+    items.push({
+      id: "comp_yesterday_fats_done",
+      label: "Essential Fats Debt Paid",
+      detail: "Healthy fats requirement fulfilled today",
+      pointsDelta: +4,
+      type: "positive",
+      category: "nutrition",
     });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { CheckCircle2, Circle, Sparkles, Footprints, Droplet, Salad, Dumbbell, Utensils, Moon } from "lucide-react";
 import { useHealthStore } from "@/context/useHealthStore";
 import { format, subDays, parseISO } from "date-fns";
@@ -8,8 +8,32 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export function TodayCompensationTasks() {
-  const { selectedDate, getLogForDate, saveDailyLog, togglePrescriptionCompleted, dailyLogs } = useHealthStore();
+  const { selectedDate, getLogForDate, saveDailyLog, togglePrescriptionCompleted, dailyLogs, userProfile } = useHealthStore();
   const log = getLogForDate(selectedDate);
+
+  // Dynamic hours left till midnight / HP reset
+  const [hoursLeft, setHoursLeft] = useState<number>(() => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
+  });
+
+  useEffect(() => {
+    const updateHours = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      setHoursLeft(Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60))));
+    };
+    updateHours();
+    const interval = setInterval(updateHours, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const baseTargetCalories = userProfile?.dailyCalorieTarget || 2000;
+  const weightKg = userProfile?.weightKg || 70;
+  const minProtein = Math.round(weightKg * 0.8);
 
   // Check Yesterday's Log for Biological Carryover Debt
   const prevDate = format(subDays(parseISO(selectedDate), 1), "yyyy-MM-dd");
@@ -40,43 +64,63 @@ export function TodayCompensationTasks() {
   if (log.waterLiters < 2.0) {
     dynamicTasks.push({
       id: "today_water_hydrate",
-      title: "Drink 2.0L Electrolyte Water (3h Left)",
+      title: `Drink 2.0L Electrolyte Water (${hoursLeft}h left)`,
       recoveryHp: 4,
       icon: <Droplet className="w-4 h-4 text-blue-600" />,
     });
   }
 
-  // 2. Severe under-fueling
-  if (log.calories > 0 && log.calories < 1200) {
+  // 2. Calorie under-fueling / deficit
+  if (log.calories > 0 && (log.calories < 1200 || log.calories < baseTargetCalories - 450)) {
     dynamicTasks.push({
-      id: "today_refuel_protein",
-      title: "High-Protein Refuel Meal (3h Left)",
+      id: "today_cal_refuel",
+      title: `Caloric Refuel Meal / Clean Carbs (${hoursLeft}h left)`,
       recoveryHp: 5,
       icon: <Utensils className="w-4 h-4 text-emerald-600" />,
     });
   }
 
-  // 3. Caloric surplus / heavy meal
-  if (log.calories > 2300) {
+  // 3. Protein deficit
+  if (log.calories > 0 && log.macros && (log.macros.protein || 0) < minProtein) {
+    dynamicTasks.push({
+      id: "today_protein_boost",
+      title: `High-Protein Refuel Snack/Shake (${hoursLeft}h left)`,
+      recoveryHp: 5,
+      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+    });
+  }
+
+  // 4. Healthy fat deficit
+  if (log.calories > 0 && log.macros && (log.macros.fat || 0) < 30) {
+    dynamicTasks.push({
+      id: "today_healthy_fats",
+      title: `Healthy Fats Boost (Nuts / Avocado) (${hoursLeft}h left)`,
+      recoveryHp: 4,
+      icon: <Salad className="w-4 h-4 text-green-600" />,
+    });
+  }
+
+  // 5. Caloric surplus / heavy meal
+  if (log.calories > baseTargetCalories + 350) {
     dynamicTasks.push({
       id: "today_walk_digest",
-      title: "20-Min Digestion Walk (3h Left)",
+      title: `20-Min Digestion Walk (${hoursLeft}h left)`,
       recoveryHp: 4,
       icon: <Footprints className="w-4 h-4 text-emerald-600" />,
     });
   }
 
-  // 4. Outside food digestion walk
+  // 6. Outside food digestion walk
   if (log.ateOutside && !dynamicTasks.some((t) => t.id === "today_walk_digest")) {
     dynamicTasks.push({
       id: "today_walk_digest",
-      title: "20-Min Digestion Walk (3h Left)",
+      title: `20-Min Digestion Walk (${hoursLeft}h left)`,
       recoveryHp: 4,
       icon: <Footprints className="w-4 h-4 text-emerald-600" />,
     });
   }
 
-  // 5. Ultra-processed antioxidant flush
+  // 7. Ultra-processed antioxidant flush
   if (log.ultraProcessed) {
     dynamicTasks.push({
       id: "today_tea_flush",
@@ -86,7 +130,7 @@ export function TodayCompensationTasks() {
     });
   }
 
-  // 6. Low step count movement task
+  // 8. Low step count movement task
   if (log.steps < 3500) {
     dynamicTasks.push({
       id: "today_evening_walk",
@@ -125,6 +169,36 @@ export function TodayCompensationTasks() {
         title: "Hit 7,500 Steps Today (Yesterday's Movement Debt)",
         recoveryHp: 4,
         icon: <Footprints className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+
+    // Yesterday Under-fueling -> Today Refuel
+    if (yesterdayLog.calories > 0 && yesterdayLog.calories < 1300 && !dynamicTasks.some((t) => t.id === "comp_yesterday_refuel")) {
+      dynamicTasks.push({
+        id: "comp_yesterday_refuel",
+        title: "Metabolic Refuel Intake Today (Yesterday's Caloric Deficit)",
+        recoveryHp: 5,
+        icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+
+    // Yesterday Low Protein -> Today Protein Target
+    if (yesterdayLog.calories > 0 && yesterdayLog.macros && (yesterdayLog.macros.protein || 0) < minProtein && !dynamicTasks.some((t) => t.id === "comp_yesterday_protein")) {
+      dynamicTasks.push({
+        id: "comp_yesterday_protein",
+        title: "Target Adequate Protein Today (Yesterday's Protein Deficit)",
+        recoveryHp: 5,
+        icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+
+    // Yesterday Low Fat -> Today Healthy Fats
+    if (yesterdayLog.calories > 0 && yesterdayLog.macros && (yesterdayLog.macros.fat || 0) < 30 && !dynamicTasks.some((t) => t.id === "comp_yesterday_fats")) {
+      dynamicTasks.push({
+        id: "comp_yesterday_fats",
+        title: "Incorporate Healthy Fats Today (Yesterday's Fat Deficit)",
+        recoveryHp: 4,
+        icon: <Salad className="w-4 h-4 text-green-600" />,
       });
     }
   }

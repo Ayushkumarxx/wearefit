@@ -7,14 +7,24 @@ import { format } from "date-fns";
 
 export function AppHeader() {
   const { selectedDate } = useHealthStore();
-  const [hoursToMidnight, setHoursToMidnight] = useState<number>(5);
-
-  useEffect(() => {
+  const [hoursToMidnight, setHoursToMidnight] = useState<number>(() => {
     const now = new Date();
     const midnight = new Date(now);
     midnight.setHours(24, 0, 0, 0);
-    const diff = Math.max(1, Math.round((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
-    setHoursToMidnight(diff);
+    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
+  });
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diff = Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
+      setHoursToMidnight(diff);
+    };
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
+    return () => clearInterval(timer);
   }, []);
 
   const formattedDate = (() => {
