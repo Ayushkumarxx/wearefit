@@ -1,31 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Clock } from "lucide-react";
+import { Clock, Shield } from "lucide-react";
 import { useHealthStore } from "@/context/useHealthStore";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export function AppHeader() {
-  const { selectedDate } = useHealthStore();
-  const [hoursToMidnight, setHoursToMidnight] = useState<number>(() => {
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0);
-    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
-  });
-
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date();
-      const midnight = new Date(now);
-      midnight.setHours(24, 0, 0, 0);
-      const diff = Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
-      setHoursToMidnight(diff);
-    };
-    updateCountdown();
-    const timer = setInterval(updateCountdown, 60000);
-    return () => clearInterval(timer);
-  }, []);
+  const { selectedDate, dailyLogs, getReceiptForDate, getLogForDate, setIsShieldModalOpen, lastShieldDeployDate } = useHealthStore();
 
   const formattedDate = (() => {
     try {
@@ -34,6 +16,16 @@ export function AppHeader() {
       return "Today";
     }
   })();
+
+  // HP Shield Stats (Counts quality days >= 75 HP since last shield deployment)
+  const allLogs = Object.values(dailyLogs);
+  const eligibleLogs = lastShieldDeployDate
+    ? allLogs.filter((l) => l.date > lastShieldDeployDate)
+    : allLogs;
+  const qualityDaysCount = eligibleLogs.filter((l) => getReceiptForDate(l.date).totalScore >= 75).length;
+  const isUnlocked = qualityDaysCount >= 6;
+  const log = getLogForDate(selectedDate);
+  const isUsedToday = Boolean(log.hpShieldUsed);
 
   return (
     <header className="px-5 pt-4 pb-2 flex items-center justify-between shrink-0 bg-[#F7F9F6]/90 backdrop-blur-md sticky top-0 z-30">
@@ -53,11 +45,24 @@ export function AppHeader() {
         </div>
       </div>
 
-      {/* Top Right: HP Reset in 5h badge */}
-      <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full border border-neutral-200/80 shadow-2xs text-[11px] font-bold text-neutral-700">
-        <Clock className="w-3.5 h-3.5 text-[#1B6C43]" />
-        <span>HP Reset: {hoursToMidnight}h</span>
-      </div>
+      {/* Top Right: HP Shield Button */}
+      <button
+        onClick={() => setIsShieldModalOpen(true)}
+        className={cn(
+          "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95",
+          isUnlocked
+            ? "bg-[#D8EDDE] border-[#1B6C43]/40 text-[#0A3D22] hover:bg-[#C2E3CC]"
+            : "bg-white border-neutral-200/80 text-neutral-600 hover:bg-neutral-50"
+        )}
+      >
+        <Shield
+          className={cn(
+            "w-3.5 h-3.5",
+            isUnlocked ? "fill-[#1B6C43] text-[#1B6C43]" : "text-amber-700"
+          )}
+        />
+        <span>{isUnlocked ? "1 Shield" : "0 Shields"}</span>
+      </button>
     </header>
   );
 }

@@ -7,7 +7,7 @@ import { useHealthStore } from "@/context/useHealthStore";
 import { cn } from "@/lib/utils";
 
 export function BottomNav() {
-  const { activeTab, setActiveTab, setIsEntryModalOpen } = useHealthStore();
+  const { activeTab, setActiveTab, setIsQuickActionOpen } = useHealthStore();
 
   const navItems = [
     { id: "today" as const, label: "Today", icon: HeartPulse },
@@ -56,7 +56,7 @@ export function BottomNav() {
 
         {/* Floating Quick Action Button */}
         <button
-          onClick={() => setIsEntryModalOpen(true, "manual")}
+          onClick={() => setIsQuickActionOpen(true)}
           className="w-9 h-9 rounded-full bg-[#1B6C43] text-white shadow-md flex items-center justify-center hover:bg-[#155735] active:scale-90 transition-all ml-0.5 shrink-0 cursor-pointer"
           aria-label="Add health entry"
         >

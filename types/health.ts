@@ -31,6 +31,9 @@ export interface DailyLog {
     pointsDelta: number;
     category: "activity" | "nutrition" | "sleep" | "habits" | "hydration";
   }>;
+  hpShieldUsed?: boolean;
+  hpShieldBonus?: number;
+  mood?: "fatigued" | "unmotivated" | "neutral" | "good" | "motivated";
   updatedAt: string;
 }
 
@@ -82,6 +85,7 @@ export interface HealthReceipt {
 export interface GardenItem {
   id: string;
   name: string;
+  description?: string;
   emoji: string;
   type: "healthy" | "unhealthy";
   category?: "sleep" | "nutrition" | "activity" | "hydration" | "streak";

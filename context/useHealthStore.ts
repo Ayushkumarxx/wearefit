@@ -9,23 +9,24 @@ import { format, subDays } from "date-fns";
 export const getTodayString = () => format(new Date(), "yyyy-MM-dd");
 
 export const DEFAULT_LOG: Omit<DailyLog, "date" | "updatedAt"> = {
-  sleepHours: 7.5,
-  calories: 2000,
+  sleepHours: 0,
+  calories: 0,
   macros: {
-    carbs: 220,
-    protein: 130,
-    fat: 65,
+    carbs: 0,
+    protein: 0,
+    fat: 0,
   },
   ateOutside: false,
   ultraProcessed: false,
-  healthyEatingScore: 8,
-  steps: 8500,
-  workoutMinutes: 40,
-  workoutType: "Strength & Conditioning",
-  waterLiters: 2.5,
+  healthyEatingScore: 10,
+  steps: 0,
+  workoutMinutes: 0,
+  workoutType: "None",
+  waterLiters: 0,
   completedPrescriptions: [],
   activeCustomTasks: [],
   loggedAdviceActions: [],
+  mood: "neutral",
 };
 
 interface HealthState {
@@ -40,7 +41,13 @@ interface HealthState {
   entryTargetDate: string | null;
   isReceiptModalOpen: boolean;
   selectedReceiptDate: string | null;
+  isShareModalOpen: boolean;
+  shareReceiptDate: string | null;
+  isShieldModalOpen: boolean;
+  isQuickActionOpen: boolean;
   adviceHistory: AdviceResponse[];
+  hpShieldUsedDates: string[];
+  lastShieldDeployDate: string | null;
 
   // Actions
   setOnboarded: (status: boolean) => void;
@@ -50,13 +57,18 @@ interface HealthState {
   setActiveTab: (tab: "today" | "garden" | "focus" | "advisor" | "profile") => void;
   toggleFocusCompleted: (date: string) => void;
   setIsEntryModalOpen: (open: boolean, mode?: "manual" | "voice", targetDate?: string) => void;
+  setIsQuickActionOpen: (open: boolean) => void;
   setIsReceiptModalOpen: (open: boolean, date?: string) => void;
+  setIsShareModalOpen: (open: boolean, date?: string) => void;
+  setIsShieldModalOpen: (open: boolean) => void;
+  activateHpShield: (date: string, recoveryPoints: number) => void;
   saveDailyLog: (date: string, partial: Partial<DailyLog>) => void;
   getLogForDate: (date: string) => DailyLog;
   getReceiptForDate: (date: string) => HealthReceipt;
   togglePrescriptionCompleted: (date: string, taskId: string) => void;
   addAdvice: (advice: AdviceResponse) => void;
   seedDemoHistory: () => void;
+  startCleanSlate: (profile: UserProfile) => void;
   resetAllData: () => void;
 }
 
@@ -74,7 +86,13 @@ export const useHealthStore = create<HealthState>()(
       entryTargetDate: null,
       isReceiptModalOpen: false,
       selectedReceiptDate: null,
+      isShareModalOpen: false,
+      shareReceiptDate: null,
+      isShieldModalOpen: false,
+      isQuickActionOpen: false,
       adviceHistory: [],
+      hpShieldUsedDates: [],
+      lastShieldDeployDate: null,
 
       setOnboarded: (status) => set({ isOnboarded: status }),
 
@@ -107,11 +125,39 @@ export const useHealthStore = create<HealthState>()(
           entryTargetDate: open ? targetDate || state.selectedDate : null,
         })),
 
+      setIsQuickActionOpen: (open) =>
+        set({
+          isQuickActionOpen: open,
+        }),
+
       setIsReceiptModalOpen: (open, date) =>
         set({
           isReceiptModalOpen: open,
           selectedReceiptDate: date || get().selectedDate,
         }),
+
+      setIsShareModalOpen: (open, date) =>
+        set({
+          isShareModalOpen: open,
+          shareReceiptDate: date || get().selectedDate,
+        }),
+
+      setIsShieldModalOpen: (open) =>
+        set({
+          isShieldModalOpen: open,
+        }),
+
+      activateHpShield: (date, recoveryPoints) => {
+        const state = get();
+        state.saveDailyLog(date, {
+          hpShieldUsed: true,
+          hpShieldBonus: recoveryPoints,
+        });
+        set((prev) => ({
+          lastShieldDeployDate: date,
+          hpShieldUsedDates: [...prev.hpShieldUsedDates.filter((d) => d !== date), date],
+        }));
+      },
 
       saveDailyLog: (date, partial) => {
         const state = get();
@@ -334,6 +380,22 @@ export const useHealthStore = create<HealthState>()(
           dailyLogs: demoLogs,
           focusCompletedByDate: demoFocus,
           selectedDate: d0,
+          hpShieldUsedDates: [],
+          lastShieldDeployDate: null,
+        });
+      },
+
+      startCleanSlate: (profile) => {
+        set({
+          isOnboarded: true,
+          userProfile: profile,
+          dailyLogs: {},
+          focusCompletedByDate: {},
+          selectedDate: getTodayString(),
+          adviceHistory: [],
+          hpShieldUsedDates: [],
+          lastShieldDeployDate: null,
+          activeTab: "today",
         });
       },
 
@@ -345,6 +407,8 @@ export const useHealthStore = create<HealthState>()(
           focusCompletedByDate: {},
           selectedDate: getTodayString(),
           adviceHistory: [],
+          hpShieldUsedDates: [],
+          lastShieldDeployDate: null,
           activeTab: "today",
         });
       },

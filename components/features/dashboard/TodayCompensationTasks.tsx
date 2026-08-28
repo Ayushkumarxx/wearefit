@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { CheckCircle2, Circle, Sparkles, Footprints, Droplet, Salad, Dumbbell, Utensils, Moon } from "lucide-react";
+import { Check, Circle, Sparkles, Footprints, Droplet, Salad, Dumbbell, Utensils, Moon } from "lucide-react";
 import { useHealthStore } from "@/context/useHealthStore";
 import { format, subDays, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ export function TodayCompensationTasks() {
   const { selectedDate, getLogForDate, saveDailyLog, togglePrescriptionCompleted, dailyLogs, userProfile } = useHealthStore();
   const log = getLogForDate(selectedDate);
 
-  // Dynamic hours left till midnight / HP reset
+  // Dynamic hours left till midnight
   const [hoursLeft, setHoursLeft] = useState<number>(() => {
     const now = new Date();
     const midnight = new Date(now);
@@ -30,6 +30,8 @@ export function TodayCompensationTasks() {
     const interval = setInterval(updateHours, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const isLateNight = hoursLeft <= 3; // After ~9 PM
 
   const baseTargetCalories = userProfile?.dailyCalorieTarget || 2000;
   const weightKg = userProfile?.weightKg || 70;
@@ -56,66 +58,119 @@ export function TodayCompensationTasks() {
     }
   };
 
-  // Dynamic deficit tasks based on today's logged state & yesterday's carryover debt
+  // Time-of-day dynamic tasks (No redundant "X hour left" pill)
   const dynamicTasks: Array<{ id: string; title: string; recoveryHp: number; icon: React.ReactNode }> = [];
 
-  // A. TODAY'S IMMEDIATE DEFICITS:
-  // 1. Dehydration recovery
-  if (log.waterLiters < 2.0) {
-    dynamicTasks.push({
-      id: "today_water_hydrate",
-      title: `Drink 2.0L Electrolyte Water (${hoursLeft}h left)`,
-      recoveryHp: 4,
-      icon: <Droplet className="w-4 h-4 text-blue-600" />,
-    });
+  // A. TODAY'S IMMEDIATE DEFICITS (Time-Aware & Context-Aware):
+
+  // 1. Sleep Deficit Today (<6.5h sleep)
+  if (log.sleepHours > 0 && log.sleepHours < 6.5) {
+    if (hoursLeft > 6) {
+      dynamicTasks.push({
+        id: "today_sleep_nap",
+        title: "20-Min NSDR / Power Nap (Afternoon Energy Boost)",
+        recoveryHp: 5,
+        icon: <Moon className="w-4 h-4 text-purple-600" />,
+      });
+      dynamicTasks.push({
+        id: "today_sleep_caffeine",
+        title: "Zero Afternoon Stimulants (Protect Remaining Deep Sleep)",
+        recoveryHp: 4,
+        icon: <Moon className="w-4 h-4 text-purple-600" />,
+      });
+    } else {
+      dynamicTasks.push({
+        id: "today_sleep_early",
+        title: "Wind Down 45m Early Tonight (Target 8.5h Deep Sleep)",
+        recoveryHp: 6,
+        icon: <Moon className="w-4 h-4 text-purple-600" />,
+      });
+      dynamicTasks.push({
+        id: "today_sleep_cool",
+        title: "Zero Blue Light & 19°C Cool Bedroom Reset",
+        recoveryHp: 4,
+        icon: <Moon className="w-4 h-4 text-purple-600" />,
+      });
+    }
   }
 
-  // 2. Calorie under-fueling / deficit
-  if (log.calories > 0 && (log.calories < 1200 || log.calories < baseTargetCalories - 450)) {
+  // 2. Dehydration recovery
+  if (log.waterLiters < 2.0) {
+    if (isLateNight) {
+      dynamicTasks.push({
+        id: "today_water_hydrate",
+        title: "Sip 250ml Electrolyte Water (Gentle Evening Hydration)",
+        recoveryHp: 4,
+        icon: <Droplet className="w-4 h-4 text-blue-600" />,
+      });
+    } else {
+      dynamicTasks.push({
+        id: "today_water_hydrate",
+        title: `Drink ${log.waterLiters === 0 ? "2.0L" : "1.0L"} Electrolyte Mineral Water`,
+        recoveryHp: 5,
+        icon: <Droplet className="w-4 h-4 text-blue-600" />,
+      });
+    }
+  }
+
+  // 3. Heavy Workout / High Step Exertion Recovery (>90m workout or >18k steps)
+  if ((log.workoutMinutes || 0) >= 75 || (log.steps || 0) >= 16000) {
     dynamicTasks.push({
-      id: "today_cal_refuel",
-      title: `Caloric Refuel Meal / Clean Carbs (${hoursLeft}h left)`,
+      id: "today_heavy_recovery",
+      title: "Active Muscle Recovery & Warm Epsom Bath",
+      recoveryHp: 5,
+      icon: <Dumbbell className="w-4 h-4 text-amber-600" />,
+    });
+    dynamicTasks.push({
+      id: "today_heavy_protein",
+      title: "35g Leucine-Rich Protein Refuel for Muscle Repair",
       recoveryHp: 5,
       icon: <Utensils className="w-4 h-4 text-emerald-600" />,
     });
   }
 
-  // 3. Protein deficit
+  // 4. Calorie under-fueling / zero calories
+  if (log.calories === 0) {
+    dynamicTasks.push({
+      id: "today_cal_refuel",
+      title: "Fuel with 35g Clean Protein & Whole Foods",
+      recoveryHp: 5,
+      icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+    });
+  } else if (log.calories < 1200 || log.calories < baseTargetCalories - 450) {
+    if (isLateNight) {
+      dynamicTasks.push({
+        id: "today_cal_refuel",
+        title: "Light Nutrient-Dense Protein / Casein Snack",
+        recoveryHp: 5,
+        icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+      });
+    } else {
+      dynamicTasks.push({
+        id: "today_cal_refuel",
+        title: "Caloric Refuel Meal with Clean Whole Foods",
+        recoveryHp: 5,
+        icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+      });
+    }
+  }
+
+  // 5. Protein deficit
   if (log.calories > 0 && log.macros && (log.macros.protein || 0) < minProtein) {
     dynamicTasks.push({
       id: "today_protein_boost",
-      title: `High-Protein Refuel Snack/Shake (${hoursLeft}h left)`,
+      title: "High-Protein Refuel Snack (25g Protein)",
       recoveryHp: 5,
       icon: <Utensils className="w-4 h-4 text-emerald-600" />,
     });
   }
 
-  // 4. Healthy fat deficit
-  if (log.calories > 0 && log.macros && (log.macros.fat || 0) < 30) {
-    dynamicTasks.push({
-      id: "today_healthy_fats",
-      title: `Healthy Fats Boost (Nuts / Avocado) (${hoursLeft}h left)`,
-      recoveryHp: 4,
-      icon: <Salad className="w-4 h-4 text-green-600" />,
-    });
-  }
-
-  // 5. Caloric surplus / heavy meal
-  if (log.calories > baseTargetCalories + 350) {
+  // 6. Caloric surplus / heavy meal / outside food
+  if (log.calories > baseTargetCalories + 350 || log.ateOutside) {
     dynamicTasks.push({
       id: "today_walk_digest",
-      title: `20-Min Digestion Walk (${hoursLeft}h left)`,
-      recoveryHp: 4,
-      icon: <Footprints className="w-4 h-4 text-emerald-600" />,
-    });
-  }
-
-  // 6. Outside food digestion walk
-  if (log.ateOutside && !dynamicTasks.some((t) => t.id === "today_walk_digest")) {
-    dynamicTasks.push({
-      id: "today_walk_digest",
-      title: `20-Min Digestion Walk (${hoursLeft}h left)`,
-      recoveryHp: 4,
+      title: isLateNight ? "10-Min Gentle Digestion Walk" : "20-Min Post-Meal Glucose Digestion Walk",
+      recoveryHp: 5,
       icon: <Footprints className="w-4 h-4 text-emerald-600" />,
     });
   }
@@ -124,17 +179,17 @@ export function TodayCompensationTasks() {
   if (log.ultraProcessed) {
     dynamicTasks.push({
       id: "today_tea_flush",
-      title: "Green Tea / Antioxidant Flush",
+      title: "Green Tea / Antioxidant Polyphenol Flush",
       recoveryHp: 5,
       icon: <Salad className="w-4 h-4 text-green-600" />,
     });
   }
 
   // 8. Low step count movement task
-  if (log.steps < 3500) {
+  if (log.steps < 3500 && (log.workoutMinutes || 0) === 0) {
     dynamicTasks.push({
       id: "today_evening_walk",
-      title: "Brisk Movement Walk (2,500 Steps)",
+      title: isLateNight ? "15-Min Evening Stroll (1,500 Steps)" : "Brisk Movement Walk (3,000 Steps)",
       recoveryHp: 4,
       icon: <Footprints className="w-4 h-4 text-emerald-600" />,
     });
@@ -179,16 +234,29 @@ export function TodayCompensationTasks() {
         title: "Metabolic Refuel Intake Today (Yesterday's Caloric Deficit)",
         recoveryHp: 5,
         icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+        isYesterday: true,
       });
     }
 
-    // Yesterday Low Protein -> Today Protein Target
+    // Yesterday Dehydration (<1.5L) -> Today 2.5L Hydration
+    if (yesterdayLog.waterLiters < 1.5 && !dynamicTasks.some((t) => t.id === "comp_yesterday_water")) {
+      dynamicTasks.push({
+        id: "comp_yesterday_water",
+        title: "Drink 2.5L Water + Mineral Salt (Hydration Flush)",
+        recoveryHp: 4,
+        icon: <Droplet className="w-4 h-4 text-blue-600" />,
+        isYesterday: true,
+      });
+    }
+
+    // Yesterday Low Protein -> Today 35g Protein Anchor
     if (yesterdayLog.calories > 0 && yesterdayLog.macros && (yesterdayLog.macros.protein || 0) < minProtein && !dynamicTasks.some((t) => t.id === "comp_yesterday_protein")) {
       dynamicTasks.push({
         id: "comp_yesterday_protein",
-        title: "Target Adequate Protein Today (Yesterday's Protein Deficit)",
+        title: `Eat 35g Clean Protein on First Meal (Target: ${Math.round(weightKg * 1.5)}g)`,
         recoveryHp: 5,
         icon: <Utensils className="w-4 h-4 text-emerald-600" />,
+        isYesterday: true,
       });
     }
 
@@ -196,158 +264,165 @@ export function TodayCompensationTasks() {
     if (yesterdayLog.calories > 0 && yesterdayLog.macros && (yesterdayLog.macros.fat || 0) < 30 && !dynamicTasks.some((t) => t.id === "comp_yesterday_fats")) {
       dynamicTasks.push({
         id: "comp_yesterday_fats",
-        title: "Incorporate Healthy Fats Today (Yesterday's Fat Deficit)",
+        title: "Incorporate Healthy Fats Today (Fat Deficit Reset)",
         recoveryHp: 4,
         icon: <Salad className="w-4 h-4 text-green-600" />,
+        isYesterday: true,
       });
     }
   }
 
-  // Custom tasks added from "Should I...?" Advisor
-  const customTasks = log.activeCustomTasks || [];
-
-  if (dynamicTasks.length === 0 && customTasks.length === 0) {
-    return null;
-  }
+  // C. CUSTOM ADVISOR TASKS (From 'Should I Eat/Do This?' Advisor):
+  const customTasks = (log.activeCustomTasks || []).map((t) => ({
+    id: `custom_${t.id}`,
+    title: t.title,
+    recoveryHp: t.recoveryHp,
+    icon: getIcon(t.iconName),
+    isCustom: true,
+    customTaskId: t.id,
+  }));
 
   const completedList = log.completedPrescriptions || [];
 
-  const handleToggleDynamicTask = (taskId: string, recoveryHp: number) => {
-    const isAlreadyCompleted = completedList.includes(taskId);
-    togglePrescriptionCompleted(selectedDate, taskId);
-
-    if (!isAlreadyCompleted) {
-      toast.success(`Recovered +${recoveryHp} HP! 🌿`, {
-        description: "Task completed! Health points restored on receipt.",
-      });
+  const handleToggleTask = (task: { id: string; title: string; recoveryHp: number; isCustom?: boolean; customTaskId?: string }) => {
+    if (task.isCustom && task.customTaskId) {
+      const updatedCustom = (log.activeCustomTasks || []).map((t) =>
+        t.id === task.customTaskId ? { ...t, isCompleted: !t.isCompleted } : t
+      );
+      saveDailyLog(selectedDate, { activeCustomTasks: updatedCustom });
+      const willBeCompleted = !taskIsCompleted(task.id);
+      if (willBeCompleted) {
+        toast.success(`Recovered +${task.recoveryHp} HP! 🌿`, {
+          description: `Completed custom task: ${task.title}`,
+        });
+      } else {
+        toast.info("Task marked incomplete", {
+          description: "Recovery points deducted.",
+        });
+      }
+      return;
     }
-  };
 
-  const handleToggleCustomTask = (taskId: string, recoveryHp: number) => {
-    const updated = customTasks.map((t) =>
-      t.id === taskId ? { ...t, isCompleted: !t.isCompleted } : t
-    );
-    const targetTask = customTasks.find((t) => t.id === taskId);
-    const willBeCompleted = !targetTask?.isCompleted;
-
-    saveDailyLog(selectedDate, { activeCustomTasks: updated });
-
+    togglePrescriptionCompleted(selectedDate, task.id);
+    const willBeCompleted = !taskIsCompleted(task.id);
     if (willBeCompleted) {
-      toast.success(`Recovered +${recoveryHp} HP! 🌿`, {
-        description: "Task checked! Points restored on receipt.",
+      toast.success(`Recovered +${task.recoveryHp} HP! 🌿`, {
+        description: `Fulfilled compensation task: ${task.title}`,
+      });
+    } else {
+      toast.info("Task marked incomplete", {
+        description: "Recovery points deducted.",
       });
     }
   };
+
+  const taskIsCompleted = (taskId: string) => {
+    if (taskId.startsWith("custom_")) {
+      const realId = taskId.replace("custom_", "");
+      const found = (log.activeCustomTasks || []).find((t) => t.id === realId);
+      return !!found?.isCompleted;
+    }
+    return completedList.includes(taskId);
+  };
+
+  const allAvailableTasks = [...dynamicTasks, ...customTasks];
+
+  if (allAvailableTasks.length === 0) {
+    return (
+      <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs text-center space-y-1.5 select-none">
+        <div className="w-8 h-8 rounded-full bg-[#D8EDDE] text-[#0A3D22] flex items-center justify-center mx-auto">
+          <Sparkles className="w-4 h-4" />
+        </div>
+        <h4 className="font-display font-black text-xs text-[#191C1A]">Optimal Balance Maintained</h4>
+        <p className="text-[11px] text-neutral-500 max-w-xs mx-auto">
+          No urgent biological deficits or carryover debt detected for today.
+        </p>
+      </div>
+    );
+  }
+
+  const completedCount = allAvailableTasks.filter((t) => taskIsCompleted(t.id)).length;
+  const totalPotentialHp = allAvailableTasks.reduce((acc, t) => acc + t.recoveryHp, 0);
+  const earnedHp = allAvailableTasks
+    .filter((t) => taskIsCompleted(t.id))
+    .reduce((acc, t) => acc + t.recoveryHp, 0);
 
   return (
-    <div className="px-5 space-y-2.5">
-      {/* Clean Header */}
-      <div className="flex items-center gap-1.5 text-[#1B6C43] pt-1">
-        <Sparkles className="w-3.5 h-3.5" />
-        <span className="text-xs font-black uppercase tracking-wider">
-          Today's Plan to Recover
-        </span>
+    <div className="space-y-2.5 select-none">
+      {/* Header */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-[#D8EDDE] text-[#0A3D22] flex items-center justify-center font-bold">
+            <Sparkles className="w-3.5 h-3.5" />
+          </div>
+          <div>
+            <h3 className="font-display font-black text-xs text-[#191C1A]">Today&apos;s Recovery Plan</h3>
+            <p className="text-[10px] text-neutral-400 font-semibold">
+              {completedCount} of {allAvailableTasks.length} tasks completed
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Task List */}
       <div className="space-y-2">
-        {/* Dynamic Log Tasks */}
-        {dynamicTasks.map((task) => {
-          const isCompleted = completedList.includes(task.id);
-
+        {allAvailableTasks.map((task) => {
+          const isDone = taskIsCompleted(task.id);
           return (
             <div
               key={task.id}
-              onClick={() => handleToggleDynamicTask(task.id, task.recoveryHp)}
+              onClick={() => handleToggleTask(task)}
               className={cn(
-                "p-3 rounded-2xl border cursor-pointer select-none transition-all flex items-center justify-between gap-3 shadow-2xs",
-                isCompleted
-                  ? "bg-[#D8EDDE]/70 border-[#1B6C43]/30 text-neutral-500"
-                  : "bg-white border-neutral-200/80 hover:border-neutral-300"
+                "p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all active:scale-[0.99]",
+                isDone
+                  ? "bg-[#D8EDDE]/40 border-[#1B6C43]/30 shadow-2xs"
+                  : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-2xs"
               )}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
-                  {task.icon}
-                </div>
-                <span
-                  className={cn(
-                    "text-xs font-bold leading-tight",
-                    isCompleted ? "line-through text-neutral-400" : "text-[#191C1A]"
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="shrink-0">{task.icon}</div>
+                <div className="space-y-0.5 min-w-0">
+                  {(task as any).isYesterday && (
+                    <span className="text-[9px] font-black uppercase text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md inline-block mr-1.5">
+                      Yesterday Carryover
+                    </span>
                   )}
-                >
-                  {task.title}
-                </span>
+                  <span
+                    className={cn(
+                      "text-xs font-bold leading-snug block",
+                      isDone ? "text-[#0A3D22] line-through opacity-85" : "text-[#191C1A]"
+                    )}
+                  >
+                    {task.title}
+                  </span>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2.5 shrink-0">
                 <span
                   className={cn(
-                    "text-[11px] font-extrabold font-mono px-2 py-0.5 rounded-lg transition-colors",
-                    isCompleted
-                      ? "bg-[#1B6C43] text-white"
-                      : "bg-[#D8EDDE] text-[#0A3D22]"
+                    "text-[10px] font-black font-mono px-2 py-0.5 rounded-lg border",
+                    isDone
+                      ? "bg-[#1B6C43] text-white border-[#1B6C43]"
+                      : "bg-white text-[#1B6C43] border-[#1B6C43]/30"
                   )}
                 >
                   +{task.recoveryHp} HP
                 </span>
 
-                {isCompleted ? (
-                  <CheckCircle2 className="w-5 h-5 text-[#1B6C43]" />
-                ) : (
-                  <Circle className="w-5 h-5 text-neutral-300" />
-                )}
+                <div className="w-6 h-6 rounded-full flex items-center justify-center transition-all">
+                  {isDone ? (
+                    <div className="w-6 h-6 rounded-full bg-[#1B6C43] flex items-center justify-center text-white shadow-2xs">
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full border-2 border-neutral-300 bg-white" />
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
-
-        {/* Custom Added Tasks */}
-        {customTasks.map((task) => (
-          <div
-            key={task.id}
-            onClick={() => handleToggleCustomTask(task.id, task.recoveryHp)}
-            className={cn(
-              "p-3 rounded-2xl border cursor-pointer select-none transition-all flex items-center justify-between gap-3 shadow-2xs",
-              task.isCompleted
-                ? "bg-[#D8EDDE]/70 border-[#1B6C43]/30 text-neutral-500"
-                : "bg-white border-neutral-200/80 hover:border-neutral-300"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center shrink-0">
-                {getIcon(task.iconName)}
-              </div>
-              <span
-                className={cn(
-                  "text-xs font-bold leading-tight",
-                  task.isCompleted ? "line-through text-neutral-400" : "text-[#191C1A]"
-                )}
-              >
-                {task.title}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span
-                className={cn(
-                  "text-[11px] font-extrabold font-mono px-2 py-0.5 rounded-lg transition-colors",
-                  task.isCompleted
-                    ? "bg-[#1B6C43] text-white"
-                    : "bg-[#D8EDDE] text-[#0A3D22]"
-                )}
-              >
-                +{task.recoveryHp} HP
-              </span>
-
-              {task.isCompleted ? (
-                <CheckCircle2 className="w-5 h-5 text-[#1B6C43]" />
-              ) : (
-                <Circle className="w-5 h-5 text-neutral-300" />
-              )}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );

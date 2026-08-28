@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isAfter, startOfToday, parseISO, subMonths, addMonths } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, CalendarOff, Lock, TrendingUp, TrendingDown, Edit3 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, CalendarOff, Lock, TrendingUp, TrendingDown, Edit3, Trees, Sparkles } from "lucide-react";
 import { useHealthStore, getTodayString } from "@/context/useHealthStore";
 import { DailyReceiptCard } from "@/components/features/dashboard/DailyReceiptCard";
 import { TomorrowPrescriptionCard } from "@/components/features/dashboard/TomorrowPrescriptionCard";
+import { generateGardenFromLogs } from "@/lib/garden-generator";
 import { M3Button } from "@/components/ui/M3Button";
 import { cn } from "@/lib/utils";
 
@@ -26,16 +27,24 @@ export function HealthCalendar() {
 
   const selectedDateObj = parseISO(calendarActiveDate);
   const isFutureDate = isAfter(selectedDateObj, today);
-  const hasLogForSelected = !!dailyLogs[calendarActiveDate];
+  const currentSelectedLog = dailyLogs[calendarActiveDate];
+  const hasLogForSelected = Boolean(
+    currentSelectedLog &&
+      (currentSelectedLog.sleepHours > 0 ||
+        currentSelectedLog.calories > 0 ||
+        currentSelectedLog.waterLiters > 0)
+  );
   const activeDayReceipt = getReceiptForDate(calendarActiveDate);
 
-  // Compute 7-day average for comparative insight
-  const allLogs = Object.values(dailyLogs);
+  // Compute 7-day average for comparative insight (only for valid logged days)
+  const validLogs = Object.values(dailyLogs).filter(
+    (l) => l.sleepHours > 0 || l.calories > 0 || l.waterLiters > 0
+  );
   const avgScore =
-    allLogs.length > 0
+    validLogs.length > 0
       ? Math.round(
-          allLogs.reduce((acc, l) => acc + (getReceiptForDate(l.date).totalScore || 75), 0) /
-            allLogs.length
+          validLogs.reduce((acc, l) => acc + (getReceiptForDate(l.date).totalScore || 75), 0) /
+            validLogs.length
         )
       : 80;
 
@@ -45,6 +54,8 @@ export function HealthCalendar() {
   const getDayScoreData = (dateStr: string) => {
     const log = dailyLogs[dateStr];
     if (!log) return null;
+    const hasCore = log.sleepHours > 0 || log.calories > 0 || log.waterLiters > 0;
+    if (!hasCore) return null;
     return getReceiptForDate(dateStr);
   };
 
@@ -230,29 +241,97 @@ export function HealthCalendar() {
                 </div>
               </div>
 
-              {/* Comparative Performance Insight */}
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-1">
+              {/* Comparative Performance Insight & Mood */}
+              <div className="flex-1 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {scoreDiff >= 0 ? (
                     <div className="inline-flex items-center gap-1 text-[#0A3D22] bg-[#D8EDDE] px-2.5 py-0.5 rounded-full font-bold text-xs">
                       <TrendingUp className="w-3.5 h-3.5 text-[#1B6C43]" />
-                      <span>+{scoreDiffPct}% Above 7-Day Avg</span>
+                      <span>+{scoreDiffPct}% Above Avg</span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center gap-1 text-[#90000A] bg-[#FFE8E6] px-2.5 py-0.5 rounded-full font-bold text-xs">
                       <TrendingDown className="w-3.5 h-3.5 text-[#BA1A1A]" />
-                      <span>-{scoreDiffPct}% Below 7-Day Avg</span>
+                      <span>-{scoreDiffPct}% Below Avg</span>
                     </div>
+                  )}
+
+                  {/* Day Mood Badge */}
+                  {dailyLogs[calendarActiveDate]?.mood && (
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200/80 text-neutral-700">
+                      {dailyLogs[calendarActiveDate]?.mood === "motivated"
+                        ? "🔥 Motivated"
+                        : dailyLogs[calendarActiveDate]?.mood === "good"
+                        ? "😊 Good Vitality"
+                        : dailyLogs[calendarActiveDate]?.mood === "fatigued"
+                        ? "😫 Fatigued"
+                        : dailyLogs[calendarActiveDate]?.mood === "unmotivated"
+                        ? "😔 Low Drive"
+                        : "😐 Balanced"}
+                    </span>
                   )}
                 </div>
 
                 <p className="text-xs text-neutral-600 leading-snug">
                   {scoreDiff >= 0
-                    ? `Optimal biological recovery (+${scoreDiff} HP above your ${avgScore} HP average).`
-                    : `Accumulated ${Math.abs(scoreDiff)} HP fatigue debt compared to your ${avgScore} HP average.`}
+                    ? `Optimal biological recovery (+${scoreDiff} HP above your ${avgScore} HP baseline).`
+                    : `Accumulated ${Math.abs(scoreDiff)} HP fatigue debt compared to your ${avgScore} HP baseline.`}
                 </p>
               </div>
             </div>
+
+            {/* Garden Growth on This Day: EMOJIS ONLY */}
+            {(() => {
+              const dayLog = dailyLogs[calendarActiveDate];
+              if (!dayLog) return null;
+              const gardenItems = generateGardenFromLogs({ [calendarActiveDate]: dayLog });
+              if (gardenItems.length === 0) return null;
+
+              const blooms = gardenItems.filter((i) => i.type === "healthy");
+              const weeds = gardenItems.filter((i) => i.type === "unhealthy");
+
+              return (
+                <div className="bg-white p-4 rounded-3xl border border-neutral-200/80 shadow-xs space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-[#191C1A] flex items-center gap-1.5">
+                      <Trees className="w-3.5 h-3.5 text-[#1B6C43]" />
+                      Garden Growth
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-semibold">Sprouted on this date</span>
+                  </div>
+
+                  {/* 1. Blossoms Emojis */}
+                  {blooms.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {blooms.map((item) => (
+                        <div
+                          key={item.id}
+                          className="w-10 h-10 rounded-2xl bg-[#D8EDDE]/60 border border-[#1B6C43]/20 flex items-center justify-center text-xl shadow-2xs"
+                          title={item.name}
+                        >
+                          {item.emoji}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 2. Weeds Emojis */}
+                  {weeds.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-neutral-100">
+                      {weeds.map((item) => (
+                        <div
+                          key={item.id}
+                          className="w-10 h-10 rounded-2xl bg-[#FFE8E6]/70 border border-[#BA1A1A]/20 flex items-center justify-center text-xl shadow-2xs"
+                          title={item.name}
+                        >
+                          {item.emoji}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Statement Receipt */}
             <DailyReceiptCard receipt={activeDayReceipt} />

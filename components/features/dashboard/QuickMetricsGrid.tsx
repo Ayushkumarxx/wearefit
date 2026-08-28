@@ -6,7 +6,8 @@ import { useHealthStore } from "@/context/useHealthStore";
 import { cn } from "@/lib/utils";
 
 export function QuickMetricsGrid() {
-  const { selectedDate, getLogForDate, userProfile, setIsEntryModalOpen } = useHealthStore();
+  const { selectedDate, getLogForDate, userProfile, setIsEntryModalOpen, dailyLogs } = useHealthStore();
+  const hasData = Boolean(dailyLogs[selectedDate]);
   const log = getLogForDate(selectedDate);
 
   const targetCalories = userProfile?.dailyCalorieTarget || 2000;
@@ -15,6 +16,7 @@ export function QuickMetricsGrid() {
   const targetProtein = Math.round((userProfile?.weightKg || 70) * 1.5);
 
   const getFoodRatingText = (score: number) => {
+    if (!hasData) return "Not Logged";
     if (score >= 9) return "Nutrient Dense";
     if (score >= 7) return "Clean Balanced";
     if (score >= 5) return "Moderate Meal";
@@ -26,7 +28,7 @@ export function QuickMetricsGrid() {
     {
       id: "sleep",
       title: "Sleep Recovery",
-      value: log.sleepHours,
+      value: hasData ? log.sleepHours : "--",
       unit: "hrs",
       subtext: `Target ${targetSleep}h`,
       icon: <Moon className="w-4 h-4 text-blue-600" />,
@@ -36,7 +38,7 @@ export function QuickMetricsGrid() {
     {
       id: "calories",
       title: "Energy In",
-      value: log.calories,
+      value: hasData ? log.calories : 0,
       unit: "kcal",
       subtext: `Goal ${targetCalories}`,
       icon: <Flame className="w-4 h-4 text-amber-600" />,
@@ -46,7 +48,7 @@ export function QuickMetricsGrid() {
     {
       id: "protein",
       title: "Protein Intake",
-      value: log.macros?.protein || 0,
+      value: hasData ? (log.macros?.protein || 0) : 0,
       unit: "g",
       subtext: `Goal ${targetProtein}g`,
       icon: <Utensils className="w-4 h-4 text-emerald-600" />,
@@ -56,7 +58,7 @@ export function QuickMetricsGrid() {
     {
       id: "fat",
       title: "Dietary Fats",
-      value: log.macros?.fat || 0,
+      value: hasData ? (log.macros?.fat || 0) : 0,
       unit: "g",
       subtext: "Target 45-65g",
       icon: <Salad className="w-4 h-4 text-rose-600" />,
@@ -66,7 +68,7 @@ export function QuickMetricsGrid() {
     {
       id: "steps",
       title: "Daily Movement",
-      value: log.steps.toLocaleString(),
+      value: hasData ? log.steps.toLocaleString() : "0",
       unit: "steps",
       subtext: `Goal ${targetSteps / 1000}k`,
       icon: <Footprints className="w-4 h-4 text-emerald-600" />,
@@ -76,7 +78,7 @@ export function QuickMetricsGrid() {
     {
       id: "food",
       title: "Food Quality",
-      value: `${log.healthyEatingScore}/10`,
+      value: hasData ? `${log.healthyEatingScore}/10` : "--/10",
       unit: "",
       subtext: getFoodRatingText(log.healthyEatingScore),
       icon: <Salad className="w-4 h-4 text-green-700" />,
@@ -86,7 +88,7 @@ export function QuickMetricsGrid() {
     {
       id: "water",
       title: "Hydration",
-      value: log.waterLiters,
+      value: hasData ? log.waterLiters : 0,
       unit: "L",
       subtext: "Target 2.5L",
       icon: <Droplet className="w-4 h-4 text-blue-600" />,

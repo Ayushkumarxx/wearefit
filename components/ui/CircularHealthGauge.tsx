@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, ShieldAlert, HeartPulse, Flame } from "lucide-react";
+import { Flame, Clock, Sparkles, HeartPulse, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CircularHealthGaugeProps {
   score: number;
   maxScore?: number;
   streakDays?: number;
+  hasData?: boolean;
   className?: string;
   onTap?: () => void;
 }
@@ -17,14 +18,16 @@ export function CircularHealthGauge({
   score,
   maxScore = 100,
   streakDays = 4,
+  hasData = true,
   className,
   onTap,
 }: CircularHealthGaugeProps) {
   const [displayedScore, setDisplayedScore] = useState(score);
 
+  // Smooth number increment animation on score change
   useEffect(() => {
-    const start = displayedScore;
-    const end = Math.max(0, Math.min(100, score));
+    let start = displayedScore;
+    let end = score;
     if (start === end) return;
 
     let frame = 0;
@@ -40,21 +43,20 @@ export function CircularHealthGauge({
   }, [score, displayedScore]);
 
   // Radius, dimensions and stroke
-  const size = 260;
-  const strokeWidth = 16;
+  const size = 250;
+  const strokeWidth = 14;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.max(0, Math.min(1, displayedScore / maxScore));
+  const isZeroOrEmpty = !hasData || displayedScore === 0;
+  const progress = isZeroOrEmpty ? 0 : Math.min(1, displayedScore / maxScore);
   const strokeDashoffset = circumference - progress * circumference;
 
-  // Determine theme based on score tier
+  // Determine dynamic Lucide icon & gradients based on score
   let tier = {
     color: "#1B6C43",
     gradientStart: "#34D399",
     gradientEnd: "#059669",
-    label: "Peak Vitality",
-    badgeBg: "bg-[#D8EDDE] text-[#0A3D22] border-[#B9DEC3]",
-    icon: <Sparkles className="w-3 h-3 text-[#1B6C43]" />,
+    icon: <Sparkles className="w-4 h-4 text-[#1B6C43]" />,
   };
 
   if (displayedScore < 60) {
@@ -62,20 +64,37 @@ export function CircularHealthGauge({
       color: "#BA1A1A",
       gradientStart: "#FB7185",
       gradientEnd: "#E11D48",
-      label: "Recovery Debt",
-      badgeBg: "bg-[#FFE8E6] text-[#690005] border-[#FFDAD6]",
-      icon: <ShieldAlert className="w-3 h-3 text-[#BA1A1A]" />,
+      icon: <ShieldAlert className="w-4 h-4 text-[#BA1A1A]" />,
     };
   } else if (displayedScore < 85) {
     tier = {
       color: "#D97706",
       gradientStart: "#FBBF24",
       gradientEnd: "#D97706",
-      label: "Balanced",
-      badgeBg: "bg-[#FFF4D9] text-[#78350F] border-[#FFE7A3]",
-      icon: <HeartPulse className="w-3 h-3 text-[#D97706]" />,
+      icon: <HeartPulse className="w-4 h-4 text-[#D97706]" />,
     };
   }
+
+  // Calculate hours left until midnight reset
+  const [hoursToMidnight, setHoursToMidnight] = useState<number>(() => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    return Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
+  });
+
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24, 0, 0, 0);
+      const diff = Math.max(1, Math.ceil((midnight.getTime() - now.getTime()) / (1000 * 60 * 60)));
+      setHoursToMidnight(diff);
+    };
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <motion.div
@@ -88,15 +107,27 @@ export function CircularHealthGauge({
         className
       )}
     >
-      {/* Streak Badge Placed Cleanly Above the Circle */}
-      <div className="flex items-center gap-1.5 bg-[#FFF4D9] text-[#78350F] px-3 py-1 rounded-full text-xs font-black border border-[#FFE7A3] shadow-2xs mb-2">
-        <Flame className="w-3.5 h-3.5 fill-[#F59E0B] text-[#F59E0B]" />
-        <span>{streakDays}d Active Streak</span>
-      </div>
-
       <div className="relative w-[250px] h-[250px] flex items-center justify-center">
+        {/* Breathing Liquid Vitality Glow Aura */}
+        {displayedScore >= 80 && (
+          <motion.div
+            initial={{ opacity: 0.3, scale: 0.95 }}
+            animate={{ opacity: [0.35, 0.65, 0.35], scale: [0.96, 1.04, 0.96] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-6 rounded-full bg-gradient-to-tr from-emerald-300/30 to-green-400/20 blur-2xl pointer-events-none"
+          />
+        )}
+        {displayedScore >= 60 && displayedScore < 80 && (
+          <motion.div
+            initial={{ opacity: 0.25, scale: 0.96 }}
+            animate={{ opacity: [0.25, 0.5, 0.25], scale: [0.96, 1.02, 0.96] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-6 rounded-full bg-gradient-to-tr from-amber-300/25 to-yellow-400/15 blur-2xl pointer-events-none"
+          />
+        )}
+
         {/* SVG Progress Ring */}
-        <svg className="w-full h-full -rotate-90 drop-shadow-xs" viewBox={`0 0 ${size} ${size}`}>
+        <svg className="w-full h-full -rotate-90 drop-shadow-xs relative z-10" viewBox={`0 0 ${size} ${size}`}>
           <defs>
             <linearGradient id="m3ScoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor={tier.gradientStart} />
@@ -104,7 +135,7 @@ export function CircularHealthGauge({
             </linearGradient>
 
             <filter id="m3GlowShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.15" floodColor={tier.gradientEnd} />
+              <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.25" floodColor={tier.gradientEnd} />
             </filter>
           </defs>
 
@@ -119,44 +150,54 @@ export function CircularHealthGauge({
             strokeLinecap="round"
           />
 
-          {/* Active Arc */}
-          <motion.circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="url(#m3ScoreGradient)"
-            strokeWidth={strokeWidth}
-            fill="transparent"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset }}
-            transition={{ type: "spring", stiffness: 50, damping: 14 }}
-            filter="url(#m3GlowShadow)"
-          />
+          {/* Active HP Score Arc (Only when score > 0) */}
+          {hasData && displayedScore > 0 && (
+            <motion.circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke="url(#m3ScoreGradient)"
+              strokeWidth={strokeWidth}
+              fill="transparent"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              initial={{ strokeDashoffset: circumference }}
+              animate={{ strokeDashoffset }}
+              transition={{ type: "spring", stiffness: 50, damping: 14 }}
+              filter="url(#m3GlowShadow)"
+            />
+          )}
         </svg>
 
-        {/* Center Content Stack */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+        {/* Center Content Stack: Top Dynamic Icon -> Big Score -> Time Left */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 z-20">
+          {/* Top Dynamic Status Icon */}
+          <div className="flex items-center justify-center mb-1 text-[#1B6C43]">
+            {tier.icon}
+          </div>
+
           {/* Big Bold Score Numbers */}
-          <div className="flex items-baseline justify-center font-display my-0.5">
-            <span className="text-7xl font-black tracking-tight text-[#191C1A] leading-none">
-              {displayedScore}
+          <div className="flex items-baseline justify-center font-display leading-none">
+            <span className="text-7xl font-black tracking-tight text-[#191C1A]">
+              {hasData ? displayedScore : "--"}
             </span>
             <span className="text-xl font-black text-[#1B6C43] ml-1 tracking-tight">
               HP
             </span>
           </div>
 
-          {/* Status Tier Badge */}
-          <div
-            className={cn(
-              "px-3 py-0.5 rounded-full text-[11px] font-extrabold tracking-wide flex items-center gap-1 shadow-2xs border mt-1.5",
-              tier.badgeBg
+          {/* Clean Minimal Time Remaining / Tap to Log */}
+          <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-400 mt-2">
+            {hasData ? (
+              <>
+                <Clock className="w-3.5 h-3.5 text-[#1B6C43]" />
+                <span>{hoursToMidnight}h left today</span>
+              </>
+            ) : (
+              <span className="text-[#1B6C43] font-black bg-[#D8EDDE] px-2 py-0.5 rounded-full text-[10px]">
+                Tap to Log Today
+              </span>
             )}
-          >
-            {tier.icon}
-            <span>{tier.label}</span>
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@
 import React from "react";
 import { Sparkles, Moon, Footprints, Dumbbell, Salad, Droplet } from "lucide-react";
 import { HealthReceipt } from "@/types/health";
+import { useHealthStore } from "@/context/useHealthStore";
+import { format, addDays, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface TomorrowPrescriptionCardProps {
@@ -11,8 +13,28 @@ interface TomorrowPrescriptionCardProps {
 }
 
 export function TomorrowPrescriptionCard({ receipt, className }: TomorrowPrescriptionCardProps) {
-  // If score is pristine (>=95) with no penalties, no recovery is needed
-  if (receipt.items.length === 0 || receipt.totalScore >= 95 || receipt.prescriptions.length === 0) {
+  const { getLogForDate } = useHealthStore();
+
+  const tomorrowDate = (() => {
+    try {
+      return format(addDays(parseISO(receipt.date), 1), "yyyy-MM-dd");
+    } catch {
+      return receipt.date;
+    }
+  })();
+
+  const tomorrowLog = getLogForDate(tomorrowDate);
+  const customTomorrowTasks = tomorrowLog?.activeCustomTasks || [];
+  const prescriptions = receipt?.prescriptions || [];
+  const items = receipt?.items || [];
+  const totalScore = receipt?.totalScore || 0;
+
+  // If score is pristine (>=95) with no penalties and no custom tasks, hide card
+  if (
+    prescriptions.length === 0 &&
+    customTomorrowTasks.length === 0 &&
+    (items.length === 0 || totalScore >= 95)
+  ) {
     return null;
   }
 
@@ -62,6 +84,20 @@ export function TomorrowPrescriptionCard({ receipt, className }: TomorrowPrescri
               {getIcon(task.iconName)}
             </div>
             <span className="text-xs font-bold text-[#191C1A]">
+              {task.title}
+            </span>
+          </div>
+        ))}
+
+        {customTomorrowTasks.map((task) => (
+          <div
+            key={task.id}
+            className="p-3 rounded-2xl bg-[#F0F7F2] border border-[#1B6C43]/20 flex items-center gap-3"
+          >
+            <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center shrink-0 shadow-2xs border border-emerald-100">
+              {getIcon(task.iconName)}
+            </div>
+            <span className="text-xs font-bold text-[#0A3D22]">
               {task.title}
             </span>
           </div>

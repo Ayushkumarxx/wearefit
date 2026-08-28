@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { Copy } from "lucide-react";
+import { Download, Sparkles } from "lucide-react";
 import { HealthReceipt } from "@/types/health";
-import { toast } from "sonner";
+import { useHealthStore } from "@/context/useHealthStore";
 import { cn } from "@/lib/utils";
 
 interface DailyReceiptCardProps {
@@ -13,14 +13,7 @@ interface DailyReceiptCardProps {
 }
 
 export function DailyReceiptCard({ receipt, showActions = true, className }: DailyReceiptCardProps) {
-  const handleCopySummary = async () => {
-    const summary = `🧾 WEAREFIT • RX Statement\nDate: ${receipt.date} | ID: ${receipt.receiptId}\nFinal Score: ${receipt.totalScore} HP [Grade ${receipt.grade}]\n\nSummary:\n${receipt.items.map((it) => `• ${it.label}: ${it.pointsDelta > 0 ? `+${it.pointsDelta}` : it.pointsDelta} HP (${it.detail})`).join("\n")}`;
-
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(summary);
-      toast.success("Receipt copied to clipboard!");
-    }
-  };
+  const { setIsShareModalOpen } = useHealthStore();
 
   return (
     <div
@@ -29,14 +22,16 @@ export function DailyReceiptCard({ receipt, showActions = true, className }: Dai
         className
       )}
     >
+      {/* Top Perforated Paper Tear Edge */}
+      <div className="absolute top-0 inset-x-0 h-2 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-300 via-transparent to-transparent opacity-60" />
+
       {/* Brand Header */}
       <div className="text-center pb-3 border-b border-dashed border-neutral-300 space-y-1">
-        <div className="flex items-center justify-center gap-1.5 font-display font-black text-lg tracking-wider text-[#191C1A]">
+        <div className="flex items-center justify-center gap-2 font-display font-black text-lg tracking-wider text-[#191C1A]">
           <div className="w-5 h-5 rounded-lg bg-[#1B6C43] text-white flex items-center justify-center text-xs font-black">
             w
           </div>
           <span>WEAREFIT</span>
-          <span className="text-[#1B6C43] bg-[#D8EDDE] px-1.5 py-0.2 rounded-md text-xs font-black">RX</span>
         </div>
 
         <div className="flex justify-between items-center text-[10px] text-neutral-500 font-mono pt-1">
@@ -57,10 +52,10 @@ export function DailyReceiptCard({ receipt, showActions = true, className }: Dai
           Point Transactions
         </div>
 
-        {receipt.items.length === 0 ? (
+        {(receipt?.items || []).length === 0 ? (
           <p className="text-xs text-neutral-400 italic py-1">No metrics logged for this day yet.</p>
         ) : (
-          receipt.items.map((item) => (
+          (receipt?.items || []).map((item) => (
             <div key={item.id} className="flex justify-between items-start text-xs leading-tight">
               <div>
                 <p className="font-bold text-[#191C1A]">{item.label}</p>
@@ -141,15 +136,17 @@ export function DailyReceiptCard({ receipt, showActions = true, className }: Dai
         </span>
       </div>
 
-      {/* Copy Actions */}
+      {/* Actions */}
       {showActions && (
-        <button
-          onClick={handleCopySummary}
-          className="w-full py-2.5 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-[#191C1A] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <Copy className="w-3.5 h-3.5 text-neutral-600" />
-          <span>Copy Summary Receipt</span>
-        </button>
+        <div className="pt-1">
+          <button
+            onClick={() => setIsShareModalOpen(true, receipt.date)}
+            className="w-full py-2.5 rounded-2xl bg-[#1B6C43] hover:bg-[#155735] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Save Slip Image</span>
+          </button>
+        </div>
       )}
     </div>
   );

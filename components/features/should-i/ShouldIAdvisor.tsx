@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, RefreshCw, Check, Plus, Footprints, HelpCircle, ChevronRight } from "lucide-react";
 import { M3Button } from "@/components/ui/M3Button";
 import { useHealthStore } from "@/context/useHealthStore";
+import { format, addDays, parseISO } from "date-fns";
 import {
   CATEGORIZED_ADVICE_QUESTIONS,
   evaluateShouldIQuestion,
@@ -60,7 +61,13 @@ export function ShouldIAdvisor() {
   const handleAddCompensationTask = () => {
     if (!activeResponse?.suggestedCompensation) return;
 
-    const customTasks = currentLog.activeCustomTasks || [];
+    const isTomorrow = activeResponse.actionTiming === "tomorrow";
+    const targetDate = isTomorrow
+      ? format(addDays(parseISO(selectedDate), 1), "yyyy-MM-dd")
+      : selectedDate;
+
+    const targetLog = getLogForDate(targetDate);
+    const customTasks = targetLog.activeCustomTasks || [];
     const taskObj = {
       id: `task_${Date.now()}`,
       title: activeResponse.compensationTip || activeResponse.suggestedCompensation.title,
@@ -69,12 +76,12 @@ export function ShouldIAdvisor() {
       isCompleted: false,
     };
 
-    saveDailyLog(selectedDate, {
+    saveDailyLog(targetDate, {
       activeCustomTasks: [...customTasks.filter((t) => t.title !== taskObj.title), taskObj],
     });
 
-    toast.success("Task Added to Today's Plan! 🌿", {
-      description: `${taskObj.title} is ready in your recovery tasks.`,
+    toast.success(isTomorrow ? "Task Scheduled for Tomorrow's Plan! 🌿" : "Task Added to Today's Plan! 🌿", {
+      description: `${taskObj.title} is ready in your ${isTomorrow ? "Tomorrow" : "Today"} plan.`,
     });
   };
 
@@ -128,12 +135,12 @@ export function ShouldIAdvisor() {
   return (
     <div className="p-5 space-y-4 select-none">
       {/* Header */}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <h1 className="font-display font-black text-2xl text-[#191C1A]">
           "Should I...?" Advisor
         </h1>
         <p className="text-xs text-neutral-500">
-          Ask before you indulge. See instant dynamic impact on your 100 HP score.
+          Ask before you indulge. See instant biological score impact.
         </p>
       </div>
 
@@ -333,32 +340,28 @@ export function ShouldIAdvisor() {
                       className="px-3 py-1.5 rounded-xl bg-[#1B6C43] text-white text-xs font-bold hover:bg-[#155735] shadow-2xs shrink-0 cursor-pointer flex items-center gap-1 active:scale-95 transition-all"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Add Task</span>
+                      <span>{activeResponse.actionTiming === "tomorrow" ? "Add to Tomorrow" : "Add to Today"}</span>
                     </button>
                   </div>
                 )}
 
                 {/* Actions: 'I Did This' & 'Ask Another' */}
                 <div className="pt-1 flex items-center gap-2">
-                  <M3Button
-                    size="md"
-                    variant="filled"
+                  <button
                     onClick={handleIDidThis}
-                    className="flex-1 shadow-xs"
-                    icon={<Check className="w-4 h-4" />}
+                    className="flex-1 h-11 rounded-2xl bg-[#1B6C43] hover:bg-[#155735] text-white font-extrabold text-xs shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
                   >
-                    I Did This
-                  </M3Button>
+                    <Check className="w-4 h-4" />
+                    <span>I Did This</span>
+                  </button>
 
-                  <M3Button
-                    size="md"
-                    variant="outlined"
+                  <button
                     onClick={() => setActiveResponse(null)}
-                    className="px-4"
-                    icon={<RefreshCw className="w-4 h-4" />}
+                    className="px-4 h-11 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-extrabold text-xs border border-neutral-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-98"
                   >
-                    Ask Another
-                  </M3Button>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Ask Another</span>
+                  </button>
                 </div>
               </>
             )}

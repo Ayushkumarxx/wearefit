@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Sliders, ReceiptText, Activity } from "lucide-react";
+import { Mic, Sliders, ReceiptText, Activity, Zap } from "lucide-react";
 import { CircularHealthGauge } from "@/components/ui/CircularHealthGauge";
 import { M3Button } from "@/components/ui/M3Button";
 import { useHealthStore } from "@/context/useHealthStore";
@@ -11,9 +11,21 @@ import { format, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export function HealthScoreHero() {
-  const { selectedDate, getReceiptForDate, setIsEntryModalOpen, setIsReceiptModalOpen, dailyLogs } = useHealthStore();
+  const {
+    selectedDate,
+    getReceiptForDate,
+    getLogForDate,
+    setIsEntryModalOpen,
+    setIsReceiptModalOpen,
+    setIsQuickActionOpen,
+    dailyLogs,
+  } = useHealthStore();
   const [heroView, setHeroView] = useState<"dial" | "trend">("dial");
 
+  const currentLog = getLogForDate(selectedDate);
+  const hasLoggedCore = Boolean(
+    currentLog && currentLog.sleepHours > 0 && currentLog.calories > 0 && currentLog.waterLiters > 0
+  );
   const receipt = getReceiptForDate(selectedDate);
   const currentStreak = calculateConsecutiveStreak(dailyLogs, selectedDate);
 
@@ -90,7 +102,14 @@ export function HealthScoreHero() {
               <CircularHealthGauge
                 score={receipt.totalScore}
                 streakDays={currentStreak}
-                onTap={() => setIsReceiptModalOpen(true, selectedDate)}
+                hasData={hasLoggedCore}
+                onTap={() => {
+                  if (!hasLoggedCore) {
+                    setIsEntryModalOpen(true, "manual", selectedDate);
+                  } else {
+                    setIsReceiptModalOpen(true, selectedDate);
+                  }
+                }}
               />
             </motion.div>
           ) : (
@@ -171,13 +190,13 @@ export function HealthScoreHero() {
         </AnimatePresence>
       </div>
 
-      {/* Main Action Buttons */}
-      <div className="w-full flex items-center gap-3 pt-1">
+      {/* Main Action Buttons: Log Day + Quick Add + Voice AI Mic */}
+      <div className="w-full flex items-center gap-2 pt-1">
         <M3Button
           variant="filled"
           size="md"
           onClick={() => setIsEntryModalOpen(true, "manual")}
-          className="flex-1 shadow-sm flex items-center justify-center gap-2"
+          className="flex-1 shadow-sm flex items-center justify-center gap-1.5 font-black text-xs"
           icon={<Sliders className="w-4 h-4" />}
         >
           <span>Log Day</span>
@@ -186,19 +205,19 @@ export function HealthScoreHero() {
         <M3Button
           variant="tonal"
           size="md"
-          onClick={() => setIsEntryModalOpen(true, "voice")}
-          className="flex-1 shadow-xs flex items-center justify-center gap-2 bg-[#C2E8FC] text-[#001D2B] hover:bg-[#B0DEF7]"
-          icon={<Mic className="w-4 h-4 text-[#00658F]" />}
+          onClick={() => setIsQuickActionOpen(true)}
+          className="flex-1 shadow-xs flex items-center justify-center gap-1.5 bg-[#D8EDDE] text-[#0A3D22] hover:bg-[#C2E3CC] font-black text-xs"
+          icon={<Zap className="w-4 h-4 text-[#1B6C43]" />}
         >
-          <span>AI Voice</span>
+          <span>Quick Add</span>
         </M3Button>
 
         <button
-          onClick={() => setIsReceiptModalOpen(true, selectedDate)}
-          aria-label="View daily receipt"
-          className="h-12 w-12 rounded-full bg-white text-[#191C1A] border border-black/5 shadow-xs flex items-center justify-center hover:bg-neutral-50 active:scale-95 transition-all shrink-0 cursor-pointer"
+          onClick={() => setIsEntryModalOpen(true, "voice")}
+          aria-label="Voice AI logger"
+          className="h-11 w-11 rounded-2xl bg-[#C2E8FC] text-[#001D2B] border border-[#00658F]/20 shadow-xs flex items-center justify-center hover:bg-[#B0DEF7] active:scale-95 transition-all shrink-0 cursor-pointer"
         >
-          <ReceiptText className="w-5 h-5 text-[#1B6C43]" />
+          <Mic className="w-4 h-4 text-[#00658F]" />
         </button>
       </div>
     </div>

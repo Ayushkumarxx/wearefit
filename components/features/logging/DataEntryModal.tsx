@@ -1,22 +1,25 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   Sliders,
-  Mic,
   Moon,
   Flame,
   Footprints,
   Dumbbell,
   Droplet,
   Utensils,
-  Armchair,
   Check,
   Calendar,
+  Mic,
+  Smile,
+  Frown,
+  Meh,
+  Sparkles,
+  Zap,
 } from "lucide-react";
-import { M3Button } from "@/components/ui/M3Button";
 import { M3Slider } from "@/components/ui/M3Slider";
 import { M3Switch } from "@/components/ui/M3Switch";
 import { MacroDistributionBar } from "@/components/features/logging/MacroDistributionBar";
@@ -43,17 +46,24 @@ export function DataEntryModal() {
   const targetDate = entryTargetDate || selectedDate;
 
   const [activeTab, setActiveTab] = useState<"manual" | "voice">("manual");
-  const [formData, setFormData] = useState<DailyLog>(getLogForDate(targetDate));
-  const [isSedentary, setIsSedentary] = useState(false);
+  const [formData, setFormData] = useState<DailyLog>(() => {
+    const existing = getLogForDate(targetDate);
+    return {
+      ...existing,
+      mood: existing.mood || "neutral",
+    };
+  });
 
-  // Sync state whenever modal opens or date changes
+  // Sync state whenever modal opens or target date changes
   useEffect(() => {
     if (isEntryModalOpen) {
       const activeDate = entryTargetDate || selectedDate;
       const existing = getLogForDate(activeDate);
-      setFormData(existing);
-      setIsSedentary(existing.steps <= 2000 && existing.workoutMinutes === 0);
-      setActiveTab(entryMode);
+      setFormData({
+        ...existing,
+        mood: existing.mood || "neutral",
+      });
+      setActiveTab(entryMode === "voice" ? "voice" : "manual");
     }
   }, [isEntryModalOpen, entryTargetDate, selectedDate, entryMode]);
 
@@ -64,24 +74,44 @@ export function DataEntryModal() {
 
   if (!isEntryModalOpen) return null;
 
-  // Proportionally scale macros when total calories slider changes
   const handleCaloriesChange = (newCalories: number) => {
-    const prevCals = formData.calories || 2000;
-    const ratio = newCalories / prevCals;
+    if (newCalories === 0) {
+      setFormData((prev) => ({
+        ...prev,
+        calories: 0,
+        macros: { carbs: 0, protein: 0, fat: 0 },
+      }));
+      return;
+    }
 
-    const newCarbs = Math.max(0, Math.round(formData.macros.carbs * ratio));
-    const newProtein = Math.max(0, Math.round(formData.macros.protein * ratio));
-    const newFat = Math.max(0, Math.round(formData.macros.fat * ratio));
+    const currentTotalMacro =
+      (formData.macros.carbs || 0) * 4 +
+      (formData.macros.protein || 0) * 4 +
+      (formData.macros.fat || 0) * 9;
 
-    setFormData((prev) => ({
-      ...prev,
-      calories: newCalories,
-      macros: {
-        carbs: newCarbs,
-        protein: newProtein,
-        fat: newFat,
-      },
-    }));
+    if (currentTotalMacro === 0 || formData.calories === 0) {
+      // Default to Balanced 45% Carbs, 30% Protein, 25% Fat
+      const newCarbs = Math.round((newCalories * 0.45) / 4);
+      const newProtein = Math.round((newCalories * 0.30) / 4);
+      const newFat = Math.round((newCalories * 0.25) / 9);
+
+      setFormData((prev) => ({
+        ...prev,
+        calories: newCalories,
+        macros: { carbs: newCarbs, protein: newProtein, fat: newFat },
+      }));
+    } else {
+      const ratio = newCalories / currentTotalMacro;
+      const newCarbs = Math.max(0, Math.round(formData.macros.carbs * ratio));
+      const newProtein = Math.max(0, Math.round(formData.macros.protein * ratio));
+      const newFat = Math.max(0, Math.round(formData.macros.fat * ratio));
+
+      setFormData((prev) => ({
+        ...prev,
+        calories: newCalories,
+        macros: { carbs: newCarbs, protein: newProtein, fat: newFat },
+      }));
+    }
   };
 
   const handleMacroChange = (newMacros: typeof formData.macros, newTotalCals?: number) => {
@@ -92,367 +122,418 @@ export function DataEntryModal() {
     }));
   };
 
-  // BI-DIRECTIONAL FOOD QUALITY & MEAL TOGGLE SYNC
   const handleHealthyEatingScoreChange = (score: number) => {
-    setFormData((prev) => {
-      // If user manually increases score to >= 8 (Clean/Whole food), automatically uncheck junk/outside meal
-      if (score >= 8) {
-        return {
-          ...prev,
-          healthyEatingScore: score,
-          ateOutside: false,
-          ultraProcessed: false,
-        };
-      }
-      return {
-        ...prev,
-        healthyEatingScore: score,
-      };
-    });
+    setFormData((prev) => ({
+      ...prev,
+      healthyEatingScore: score,
+      ateOutside: score <= 4,
+      ultraProcessed: score <= 3,
+    }));
   };
 
   const handleOutsideMealToggle = (checked: boolean) => {
-    setFormData((prev) => {
-      let newScore = prev.healthyEatingScore;
-      if (checked && newScore > 5) {
-        newScore = prev.ultraProcessed ? 3 : 5;
-      }
-      return {
-        ...prev,
-        ateOutside: checked,
-        healthyEatingScore: newScore,
-      };
-    });
+    setFormData((prev) => ({
+      ...prev,
+      ateOutside: checked,
+      ultraProcessed: checked,
+      healthyEatingScore: checked ? Math.min(prev.healthyEatingScore, 3) : Math.max(prev.healthyEatingScore, 8),
+    }));
   };
 
-  const handleUltraProcessedToggle = (checked: boolean) => {
-    setFormData((prev) => {
-      let newScore = prev.healthyEatingScore;
-      if (checked) {
-        newScore = Math.min(newScore, 3);
-      }
-      return {
-        ...prev,
-        ultraProcessed: checked,
-        healthyEatingScore: newScore,
-      };
-    });
-  };
-
-  const handleSedentaryToggle = (checked: boolean) => {
-    setIsSedentary(checked);
-    if (checked) {
-      setFormData((prev) => ({
-        ...prev,
-        steps: 800,
-        workoutMinutes: 0,
-      }));
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        steps: 8000,
-        workoutMinutes: 30,
-      }));
-    }
+  const handleMoodSelect = (mood: "fatigued" | "unmotivated" | "neutral" | "good" | "motivated") => {
+    setFormData((prev) => ({ ...prev, mood }));
   };
 
   const handleSave = () => {
-    saveDailyLog(targetDate, {
-      ...formData,
-      date: targetDate,
-    });
-    toast.success(`Health Log saved for ${targetDate}! 🌿`, {
-      description: `Estimated Biological Score: ${currentEstimatedScore}/100 HP`,
-    });
+    saveDailyLog(targetDate, formData);
+    toast.success("Daily Health Statement Saved! 🌿");
     setIsEntryModalOpen(false);
   };
 
-  const formattedDateTitle = (() => {
+  const formattedTargetDate = (() => {
     try {
-      return format(parseISO(targetDate), "EEE, MMMM d, yyyy");
+      return format(parseISO(targetDate), "EEEE, MMM d");
     } catch {
       return targetDate;
     }
   })();
 
+  const MOOD_OPTIONS: Array<{
+    id: "fatigued" | "unmotivated" | "neutral" | "good" | "motivated";
+    emoji: string;
+    delta: string;
+    color: string;
+  }> = [
+    {
+      id: "fatigued",
+      emoji: "😫",
+      delta: "-5 HP",
+      color: "border-rose-300 bg-rose-50 text-rose-900",
+    },
+    {
+      id: "unmotivated",
+      emoji: "😔",
+      delta: "-2 HP",
+      color: "border-orange-300 bg-orange-50 text-orange-900",
+    },
+    {
+      id: "neutral",
+      emoji: "😐",
+      delta: "0 HP",
+      color: "border-neutral-300 bg-neutral-100 text-neutral-800",
+    },
+    {
+      id: "good",
+      emoji: "😊",
+      delta: "+2 HP",
+      color: "border-emerald-300 bg-emerald-50 text-emerald-900",
+    },
+    {
+      id: "motivated",
+      emoji: "🔥",
+      delta: "+4 HP",
+      color: "border-amber-400 bg-amber-50 text-amber-900",
+    },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       {/* Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={() => setIsEntryModalOpen(false)}
-        className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+        className="fixed inset-0 bg-black/65 backdrop-blur-xs cursor-pointer"
       />
 
-      {/* Modal Sheet with Smooth Slide-Up Animation */}
+      {/* Full-Screen / Full-Sheet Modal Container */}
       <motion.div
-        initial={{ y: "100%", opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: "100%", opacity: 0 }}
-        transition={{ type: "spring", stiffness: 350, damping: 30 }}
-        className="relative w-full max-w-md max-h-[92vh] bg-white rounded-t-[32px] sm:rounded-3xl p-5 shadow-2xl flex flex-col justify-between overflow-hidden select-none border border-neutral-200 z-10"
+        initial={{ opacity: 0, y: "100%" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100%" }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-lg h-full max-h-[94vh] sm:max-h-[90vh] bg-[#F7F9F6] rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden z-10 text-[#191C1A] select-none border-t sm:border border-neutral-200"
       >
-        {/* Header with Live Score Preview & Close */}
-        <div className="flex items-center justify-between border-b border-neutral-100 pb-3 shrink-0">
-          <div>
-            <h2 className="font-display font-extrabold text-lg text-[#191C1A]">
-              Log Health Day
-            </h2>
-            <p className="text-[11px] font-semibold text-[#1B6C43] flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
-              <span>{formattedDateTitle}</span>
-            </p>
+        {/* Sticky Top Header */}
+        <div className="bg-white/95 backdrop-blur-md px-6 py-4 border-b border-neutral-200/80 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-[#D8EDDE] text-[#0A3D22] flex items-center justify-center font-black shadow-2xs">
+              <Sliders className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h2 className="font-display font-black text-lg text-[#191C1A]">Log Daily Health</h2>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500">
+                <Calendar className="w-3.5 h-3.5 text-[#1B6C43]" />
+                <span>{formattedTargetDate}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="bg-[#D8EDDE] px-3 py-1 rounded-full text-xs font-mono font-bold text-[#0A3D22] border border-[#B9DEC3]">
-              ~{currentEstimatedScore} HP
+          <div className="flex items-center gap-2.5">
+            {/* Live HP Score Chip */}
+            <div className="bg-[#D8EDDE] border border-[#1B6C43]/30 px-3 py-1 rounded-full text-xs font-black text-[#0A3D22] shadow-2xs">
+              {currentEstimatedScore} HP
             </div>
+
             <button
               onClick={() => setIsEntryModalOpen(false)}
-              className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-200 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 flex items-center justify-center cursor-pointer transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Tab Switcher: Manual vs Voice */}
-        <div className="flex bg-neutral-100 p-1 rounded-2xl my-2.5 shrink-0">
-          <button
-            onClick={() => setActiveTab("manual")}
-            className={cn(
-              "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-              activeTab === "manual" ? "bg-white text-[#191C1A] shadow-xs" : "text-neutral-500"
-            )}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Manual Adjust</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("voice")}
-            className={cn(
-              "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-              activeTab === "voice" ? "bg-white text-[#00658F] shadow-xs" : "text-neutral-500"
-            )}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span>AI Voice Natural</span>
-          </button>
+        {/* View Switcher: Detailed Form vs Voice AI Logger */}
+        <div className="px-6 pt-3 pb-1 shrink-0">
+          <div className="flex bg-neutral-200/70 p-1 rounded-2xl text-xs font-bold">
+            <button
+              onClick={() => setActiveTab("manual")}
+              className={cn(
+                "flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer",
+                activeTab === "manual" ? "bg-white text-[#191C1A] shadow-xs font-black" : "text-neutral-500 hover:text-neutral-800"
+              )}
+            >
+              <Sliders className="w-3.5 h-3.5 text-[#1B6C43]" />
+              <span>Detailed Sliders</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("voice")}
+              className={cn(
+                "flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer",
+                activeTab === "voice" ? "bg-white text-[#191C1A] shadow-xs font-black" : "text-neutral-500 hover:text-neutral-800"
+              )}
+            >
+              <Mic className="w-3.5 h-3.5 text-purple-600" />
+              <span>Voice AI Logger</span>
+            </button>
+          </div>
         </div>
 
-        {/* Scrollable Form Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-3.5 pr-0.5 py-1">
-          {activeTab === "voice" ? (
-            <VoiceAILogger
-              currentLog={formData}
-              onApplyParsedLog={(extracted) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  ...extracted,
-                  macros: {
-                    ...prev.macros,
-                    ...(extracted.macros || {}),
-                  },
-                }));
-                setActiveTab("manual");
-              }}
-            />
-          ) : (
-            <div className="space-y-3.5">
-              {/* 1. Sleep Duration Card */}
-              <div className="bg-[#F7F9F6] p-3.5 rounded-2xl border border-neutral-200/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                      <Moon className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-[#191C1A]">Sleep Recovery</span>
-                  </div>
-                  <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
-                    {formData.sleepHours} hrs
+        {/* Scrollable Content Body with Clean Category Dividers */}
+        <div className="flex-1 overflow-y-auto px-6 py-3 space-y-5">
+          {activeTab === "manual" ? (
+            <div className="space-y-5 pb-4">
+              {/* SECTION 1: TODAY'S MOOD (ON TOP!) */}
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    Today&apos;s Mood
                   </span>
+                  <div className="h-[1px] bg-neutral-200 flex-1" />
                 </div>
-                <M3Slider
-                  min={3}
-                  max={12}
-                  step={0.5}
-                  value={formData.sleepHours}
-                  colorVariant="blue"
-                  onChange={(val) => setFormData((p) => ({ ...p, sleepHours: val }))}
-                  valueDisplay={`${formData.sleepHours} hrs`}
-                />
+
+                <div className="bg-white p-3.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-2">
+                  <div className="grid grid-cols-5 gap-1.5 pt-0.5">
+                    {MOOD_OPTIONS.map((opt) => {
+                      const isSelected = (formData.mood || "neutral") === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => handleMoodSelect(opt.id)}
+                          className={cn(
+                            "py-2.5 px-1 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer",
+                            isSelected
+                              ? cn(opt.color, "shadow-2xs font-black ring-2 ring-neutral-400/50 scale-[1.04]")
+                              : "bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-600 font-medium"
+                          )}
+                        >
+                          <span className="text-xl">{opt.emoji}</span>
+                          <span className="text-[9px] font-bold font-mono text-neutral-500">{opt.delta}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              {/* 2. Nutrition & Macro Distribution Card */}
-              <div className="bg-[#F7F9F6] p-3.5 rounded-2xl border border-neutral-200/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                      <Flame className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-[#191C1A]">Total Energy Intake</span>
-                  </div>
-                  <span className="font-mono text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                    {formData.calories} kcal
+              {/* SECTION 2: FOOD & NUTRITION */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    Food & Nutrition
                   </span>
+                  <div className="h-[1px] bg-neutral-200 flex-1" />
                 </div>
-                <M3Slider
-                  min={1000}
-                  max={4500}
-                  step={50}
-                  value={formData.calories}
-                  colorVariant="amber"
-                  onChange={handleCaloriesChange}
-                  valueDisplay={`${formData.calories} kcal`}
-                />
 
-                {/* Macro Breakdown Pie Chart & Gram Adjusters */}
-                <MacroDistributionBar
-                  macros={formData.macros}
-                  totalCalories={formData.calories}
-                  onChange={handleMacroChange}
-                />
-              </div>
-
-              {/* 3. Food Quality & Meal Habit Toggles Card (Bi-directionally synced) */}
-              <div className="bg-[#F7F9F6] p-3.5 rounded-2xl border border-neutral-200/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                      <Utensils className="w-4 h-4" />
+                {/* Unified Clean Nutrition Card */}
+                <div className="bg-white p-5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-xl bg-[#D8EDDE] text-[#0A3D22] flex items-center justify-center">
+                        <Utensils className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Clean Eating Quality</span>
                     </div>
-                    <span className="text-xs font-bold text-[#191C1A]">Clean Eating Score</span>
+                    <span className="font-mono text-xs font-black text-[#1B6C43] bg-[#D8EDDE] px-2.5 py-0.5 rounded-lg border border-[#1B6C43]/20">
+                      {formData.healthyEatingScore}/10
+                    </span>
                   </div>
-                  <span className="font-mono text-xs font-bold text-emerald-800 bg-[#D8EDDE] px-2 py-0.5 rounded-lg">
-                    {formData.healthyEatingScore}/10
-                  </span>
-                </div>
-                <M3Slider
-                  min={1}
-                  max={10}
-                  step={1}
-                  value={formData.healthyEatingScore}
-                  colorVariant="primary"
-                  onChange={handleHealthyEatingScoreChange}
-                  valueDisplay={`${formData.healthyEatingScore}/10`}
-                />
 
-                {/* Processed / Outside Meal & Ultra-Processed Sugar Toggles */}
-                <div className="pt-2 border-t border-neutral-200/80 space-y-2">
-                  <M3Switch
-                    checked={formData.ateOutside}
-                    onChange={handleOutsideMealToggle}
-                    label="Processed / Outside Meal"
-                    sublabel="Hidden oils & refined sodium"
+                  <M3Slider
+                    value={formData.healthyEatingScore}
+                    onChange={handleHealthyEatingScoreChange}
+                    min={1}
+                    max={10}
+                    step={1}
                   />
 
-                  <M3Switch
-                    checked={formData.ultraProcessed}
-                    onChange={handleUltraProcessedToggle}
-                    label="Ultra-Processed / Sugar"
-                    sublabel="Packaged sweets, sodas, or fried snacks"
-                  />
-                </div>
-              </div>
-
-              {/* 4. Movement & Exercise Card */}
-              <div className="bg-[#F7F9F6] p-3.5 rounded-2xl border border-neutral-200/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                      <Footprints className="w-4 h-4" />
+                  {/* Sub-Toggle with generous spacing */}
+                  <div className="pt-3.5 border-t border-neutral-100 flex items-center justify-between gap-3">
+                    <div className="space-y-0.5 pr-2">
+                      <span className="text-xs font-bold text-[#191C1A] block">Processed / Outside Meal</span>
+                      <span className="text-[10px] text-neutral-400 font-medium block">Restaurant, seed oils, or packaged foods</span>
                     </div>
-                    <span className="text-xs font-bold text-[#191C1A]">Daily Steps</span>
+                    <M3Switch
+                      checked={formData.ateOutside || formData.ultraProcessed}
+                      onChange={handleOutsideMealToggle}
+                    />
                   </div>
-                  <span className="font-mono text-xs font-bold text-emerald-800 bg-[#D8EDDE] px-2 py-0.5 rounded-lg">
-                    {formData.steps.toLocaleString()}
-                  </span>
                 </div>
-                <M3Slider
-                  min={500}
-                  max={25000}
-                  step={500}
-                  value={formData.steps}
-                  colorVariant="primary"
-                  onChange={(val) => setFormData((p) => ({ ...p, steps: val }))}
-                  valueDisplay={`${formData.steps.toLocaleString()} steps`}
-                />
 
-                {/* Workout Minutes */}
-                <div className="pt-2 border-t border-neutral-200/80 space-y-2">
-                  <div className="flex items-center justify-between">
+                {/* Calories & Interactive Macros */}
+                <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Dumbbell className="w-4 h-4 text-purple-600" />
-                      <span className="text-xs font-bold text-[#191C1A]">Workout Duration</span>
+                      <div className="w-7 h-7 rounded-xl bg-amber-100 text-[#D97706] flex items-center justify-center">
+                        <Flame className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Total Daily Calories</span>
                     </div>
-                    <span className="font-mono text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg">
+                    <span className="font-mono text-xs font-black text-neutral-900 bg-neutral-100 px-2.5 py-0.5 rounded-lg border border-neutral-200">
+                      {formData.calories} kcal
+                    </span>
+                  </div>
+
+                  <M3Slider
+                    value={formData.calories}
+                    onChange={handleCaloriesChange}
+                    min={0}
+                    max={5000}
+                    step={50}
+                  />
+
+                  <MacroDistributionBar
+                    macros={formData.macros}
+                    totalCalories={formData.calories}
+                    onChange={handleMacroChange}
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 3: SLEEP & RECOVERY */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    Sleep & Recovery
+                  </span>
+                  <div className="h-[1px] bg-neutral-200 flex-1" />
+                </div>
+
+                <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center">
+                        <Moon className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Sleep Duration</span>
+                    </div>
+                    <span className="font-mono text-xs font-black text-purple-800 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200">
+                      {formData.sleepHours} hrs
+                    </span>
+                  </div>
+
+                  <M3Slider
+                    value={formData.sleepHours}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, sleepHours: val }))}
+                    min={0}
+                    max={16}
+                    step={0.5}
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 4: MOVEMENT & WORKOUT */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    Movement & Workout
+                  </span>
+                  <div className="h-[1px] bg-neutral-200 flex-1" />
+                </div>
+
+                {/* Steps */}
+                <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                        <Footprints className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Daily Steps</span>
+                    </div>
+                    <span className="font-mono text-xs font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                      {formData.steps.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <M3Slider
+                    value={formData.steps}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, steps: val }))}
+                    min={0}
+                    max={30000}
+                    step={500}
+                  />
+                </div>
+
+                {/* Workout */}
+                <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                        <Dumbbell className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Workout Duration</span>
+                    </div>
+                    <span className="font-mono text-xs font-black text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200">
                       {formData.workoutMinutes} mins
                     </span>
                   </div>
+
                   <M3Slider
-                    min={0}
-                    max={180}
-                    step={5}
                     value={formData.workoutMinutes}
-                    colorVariant="coral"
-                    onChange={(val) => setFormData((p) => ({ ...p, workoutMinutes: val }))}
-                    valueDisplay={`${formData.workoutMinutes} mins`}
-                  />
-                </div>
-
-                {/* Sedentary Quick Toggle */}
-                <div className="pt-2 border-t border-neutral-200/80">
-                  <M3Switch
-                    checked={isSedentary}
-                    onChange={handleSedentaryToggle}
-                    label="Sedentary Day"
-                    sublabel="Sat at desk with minimal movement"
-                    icon={<Armchair className="w-4 h-4 text-neutral-500" />}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, workoutMinutes: val }))}
+                    min={0}
+                    max={240}
+                    step={5}
                   />
                 </div>
               </div>
 
-              {/* 5. Hydration Card */}
-              <div className="bg-[#F7F9F6] p-3.5 rounded-2xl border border-neutral-200/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                      <Droplet className="w-4 h-4" />
-                    </div>
-                    <span className="text-xs font-bold text-[#191C1A]">Hydration</span>
-                  </div>
-                  <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
-                    {formData.waterLiters} L
+              {/* SECTION 5: HYDRATION */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                    Hydration
                   </span>
+                  <div className="h-[1px] bg-neutral-200 flex-1" />
                 </div>
-                <M3Slider
-                  min={0.5}
-                  max={6.0}
-                  step={0.1}
-                  value={formData.waterLiters}
-                  colorVariant="blue"
-                  onChange={(val) => setFormData((p) => ({ ...p, waterLiters: Number(val.toFixed(1)) }))}
-                  valueDisplay={`${formData.waterLiters} L`}
-                />
+
+                <div className="bg-white p-4.5 rounded-3xl border border-neutral-200/80 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                        <Droplet className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-black text-[#191C1A]">Hydration Water</span>
+                    </div>
+                    <span className="font-mono text-xs font-black text-blue-800 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200">
+                      {formData.waterLiters} L
+                    </span>
+                  </div>
+
+                  <M3Slider
+                    value={formData.waterLiters}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, waterLiters: val }))}
+                    min={0}
+                    max={7.0}
+                    step={0.1}
+                  />
+                </div>
               </div>
+            </div>
+          ) : (
+            <div className="py-2">
+              <VoiceAILogger
+                currentLog={formData}
+                onApplyParsedLog={(updatedFields) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    ...updatedFields,
+                  }));
+                  setActiveTab("manual");
+                }}
+              />
             </div>
           )}
         </div>
 
-        {/* Save & Confirm Button */}
-        <div className="pt-3 border-t border-neutral-100 shrink-0">
-          <M3Button
-            variant="filled"
-            size="lg"
-            onClick={handleSave}
-            className="w-full shadow-md flex items-center justify-center gap-2 cursor-pointer"
-            icon={<Check className="w-5 h-5" />}
+        {/* Sticky Bottom Dual Action Bar */}
+        <div className="bg-white px-6 py-4 border-t border-neutral-200 shrink-0 flex items-center gap-3">
+          <button
+            onClick={() => setIsEntryModalOpen(false)}
+            className="py-4 px-5 rounded-2xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-sm font-bold transition-colors cursor-pointer"
           >
-            <span>Save Health Log</span>
-          </M3Button>
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 py-4 rounded-2xl bg-[#1B6C43] hover:bg-[#155735] text-white text-sm font-black shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98]"
+          >
+            <Check className="w-4.5 h-4.5" />
+            <span>Save & Calculate</span>
+          </button>
         </div>
       </motion.div>
     </div>
