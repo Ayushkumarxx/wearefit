@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 
 export function QuickMetricsGrid() {
   const { selectedDate, getLogForDate, userProfile, setIsEntryModalOpen, dailyLogs } = useHealthStore();
-  const hasData = Boolean(dailyLogs[selectedDate]);
   const log = getLogForDate(selectedDate);
+  const hasData = Boolean(
+    log && (log.sleepHours > 0 || log.calories > 0 || log.waterLiters > 0)
+  );
 
   const targetCalories = userProfile?.dailyCalorieTarget || 2000;
   const targetSleep = userProfile?.dailySleepTargetHours || 8;

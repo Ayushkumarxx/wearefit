@@ -21,12 +21,15 @@ import { GardenCalendarTab } from "@/components/features/garden/GardenCalendarTa
 import { ShouldIAdvisor } from "@/components/features/should-i/ShouldIAdvisor";
 import { ProfileSettings } from "@/components/features/profile/ProfileSettings";
 import { Sparkles, Sliders } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function HomePage() {
   const {
     isOnboarded,
     activeTab,
     selectedDate,
+    setSelectedDate,
     getReceiptForDate,
     getLogForDate,
     dailyLogs,
@@ -34,10 +37,11 @@ export default function HomePage() {
   } = useHealthStore();
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Handle client-side Zustand hydration
+  // Handle client-side Zustand hydration & date sync
   useEffect(() => {
     setIsHydrated(true);
-  }, []);
+    setSelectedDate(format(new Date(), "yyyy-MM-dd"));
+  }, [setSelectedDate]);
 
   if (!isHydrated) {
     return (

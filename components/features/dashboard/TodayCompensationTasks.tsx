@@ -325,7 +325,7 @@ export function TodayCompensationTasks() {
     return completedList.includes(taskId);
   };
 
-  const allAvailableTasks = [...dynamicTasks, ...customTasks];
+  const allAvailableTasks = [...dynamicTasks, ...customTasks].slice(0, 5);
 
   if (allAvailableTasks.length === 0) {
     return (

@@ -39,11 +39,12 @@ export function QuickActionModal() {
     const caloriesPerGram = type === "fat" ? 9 : 4;
     const addedCalories = grams * caloriesPerGram;
 
+    const currentMacros = currentLog.macros || { carbs: 0, protein: 0, fat: 0 };
     saveDailyLog(activeDate, {
       calories: Math.min(6000, currentLog.calories + addedCalories),
       macros: {
-        ...currentLog.macros,
-        [type]: currentLog.macros[type] + grams,
+        ...currentMacros,
+        [type]: (currentMacros[type] || 0) + grams,
       },
     });
 
